@@ -1,0 +1,98 @@
+@{ ViewData["Title"] = "Kanban Board"; }
+
+<div class="kanban-app">
+    <!-- Toolbar -->
+    <div class="kanban-toolbar">
+        <h1>📋 Kanban Board</h1>
+        <div class="toolbar-controls">
+            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search cards..." />
+            <select id="labelFilter" class="form-select form-select-sm">
+                <option value="">All Labels</option>
+            </select>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
+        </div>
+    </div>
+
+    <!-- Board -->
+    <div class="kanban-board">
+        <div class="kanban-column" data-column="todo">
+            <div class="column-header">
+                <span class="column-title">📝 To Do</span>
+                <span class="card-count" id="count-todo">0</span>
+                <button class="btn-add-card" onclick="openCardModal('todo')">+</button>
+            </div>
+            <div class="card-list" id="list-todo"></div>
+        </div>
+        <div class="kanban-column" data-column="inprogress">
+            <div class="column-header">
+                <span class="column-title">🔄 In Progress</span>
+                <span class="card-count" id="count-inprogress">0</span>
+                <button class="btn-add-card" onclick="openCardModal('inprogress')">+</button>
+            </div>
+            <div class="card-list" id="list-inprogress"></div>
+        </div>
+        <div class="kanban-column" data-column="done">
+            <div class="column-header">
+                <span class="column-title">✅ Done</span>
+                <span class="card-count" id="count-done">0</span>
+                <button class="btn-add-card" onclick="openCardModal('done')">+</button>
+            </div>
+            <div class="card-list" id="list-done"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Card Modal -->
+<div class="modal fade" id="cardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cardModalTitle">Add Card</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cardId" />
+                <input type="hidden" id="cardColumn" />
+                <div class="mb-3">
+                    <label for="cardTitle" class="form-label">Title</label>
+                    <input type="text" class="form-control" id="cardTitle" required />
+                </div>
+                <div class="mb-3">
+                    <label for="cardDescription" class="form-label">Description</label>
+                    <textarea class="form-control" id="cardDescription" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Labels</label>
+                    <div id="cardLabels" class="label-checkboxes"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" id="btnDeleteCard" onclick="deleteCard()" style="display:none">Delete</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCard()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Label Manager Modal -->
+<div class="modal fade" id="labelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Labels</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="labelList" class="mb-3"></div>
+                <hr />
+                <h6>Add New Label</h6>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" id="newLabelName" placeholder="Label name" />
+                    <input type="color" class="form-control form-control-color form-control-sm" id="newLabelColor" value="#3498db" />
+                    <button class="btn btn-sm btn-primary" onclick="createLabel()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

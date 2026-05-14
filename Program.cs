@@ -2,6 +2,15 @@ using kanban.net.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// When running as a Windows Service, the working directory is System32.
+// Set ContentRoot to the exe directory so App_Data and static files resolve correctly.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Host.UseContentRoot(AppContext.BaseDirectory);
+}
+
+builder.Host.UseWindowsService();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<JsonStorageService>();

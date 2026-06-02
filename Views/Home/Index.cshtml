@@ -9,9 +9,12 @@
             <select id="labelFilter" class="form-select form-select-sm">
                 <option value="">All Labels</option>
             </select>
-            <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
         </div>
+    </div>
+    <div class="toolbar-manage">
+        <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="openPriorityManager()">⚑ Priorities</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
     </div>
 
     <!-- Board -->
@@ -40,6 +43,12 @@
                 <div class="mb-3">
                     <label class="form-label">Labels</label>
                     <div id="cardLabels" class="label-checkboxes"></div>
+                </div>
+                <div class="mb-3">
+                    <label for="cardPriority" class="form-label">Priority</label>
+                    <select class="form-select form-select-sm" id="cardPriority">
+                        <option value="">None</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -73,8 +82,7 @@
     </div>
 </div>
 
-<!-- Column Manager Modal -->
-<div class="modal fade" id="columnModal" tabindex="-1">
+<!-- Column Manager Modal --><div class="modal fade" id="columnModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -89,6 +97,28 @@
                 <div class="d-flex gap-2">
                     <input type="text" class="form-control form-control-sm" id="newColumnTitle" placeholder="Column title" />
                     <button class="btn btn-sm btn-primary" onclick="createColumn()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Priority Manager Modal -->
+<div class="modal fade" id="priorityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Priorities</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="priorityList" class="mb-3"></div>
+                <hr />
+                <h6>Add New Priority</h6>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" id="newPriorityName" placeholder="Priority name" />
+                    <input type="color" class="form-control form-control-color form-control-sm" id="newPriorityColor" value="#e67e22" />
+                    <button class="btn btn-sm btn-primary" onclick="createPriority()">Add</button>
                 </div>
             </div>
         </div>

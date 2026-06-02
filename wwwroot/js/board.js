@@ -2,18 +2,21 @@
 let allCards = [];
 let allLabels = [];
 let allColumns = [];
+let allPriorities = [];
 let draggedCard = null;
 
 const API = {
     cards: '/api/cards',
     labels: '/api/labels',
-    columns: '/api/columns'
+    columns: '/api/columns',
+    priorities: '/api/priorities'
 };
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
     await loadColumns();
     await loadLabels();
+    await loadPriorities();
     await loadCards();
     setupSearch();
 });
@@ -29,6 +32,11 @@ async function loadLabels() {
     const res = await fetch(API.labels);
     allLabels = await res.json();
     renderLabelFilter();
+}
+
+async function loadPriorities() {
+    const res = await fetch(API.priorities);
+    allPriorities = await res.json();
 }
 
 async function loadColumns() {
@@ -109,6 +117,9 @@ function renderCards() {
                 ${labelsHtml ? `<div class="card-labels">${labelsHtml}</div>` : ''}
                 <div class="card-title">${escapeHtml(card.title)}</div>
                 ${card.description ? `<div class="card-description">${renderMarkdown(card.description)}</div>` : ''}
+                <div class="card-footer">
+                    ${renderPriorityChip(card.priorityId)}
+                </div>
                 <div class="card-actions">
                     <button onclick="editCard('${card.id}')" title="Edit">✏️ Edit</button>
                     <button onclick="deleteCardDirect('${card.id}')" title="Delete">🗑️</button>
@@ -156,6 +167,7 @@ function openCardModal(column) {
     document.getElementById('cardDescription').value = '';
     document.getElementById('btnDeleteCard').style.display = 'none';
     renderCardLabelCheckboxes([]);
+    renderCardPriorityOptions('');
     new bootstrap.Modal(document.getElementById('cardModal')).show();
 }
 
@@ -169,6 +181,7 @@ function editCard(id) {
     document.getElementById('cardDescription').value = card.description;
     document.getElementById('btnDeleteCard').style.display = 'inline-block';
     renderCardLabelCheckboxes(card.labelIds);
+    renderCardPriorityOptions(card.priorityId || '');
     new bootstrap.Modal(document.getElementById('cardModal')).show();
 }
 
@@ -205,11 +218,14 @@ async function saveCard() {
     const labelIds = Array.from(document.querySelectorAll('#cardLabels input:checked'))
         .map(cb => cb.value);
 
+    const priorityId = document.getElementById('cardPriority').value || null;
+
     const body = {
         title,
         description: document.getElementById('cardDescription').value.trim(),
         column: document.getElementById('cardColumn').value,
-        labelIds
+        labelIds,
+        priorityId
     };
 
     if (id) {
@@ -419,6 +435,90 @@ async function deleteLabel(id) {
     await fetch(`${API.labels}/${id}`, { method: 'DELETE' });
     await loadLabels();
     renderLabelList();
+    await loadCards();
+}
+
+// ── Priority Management ──
+function renderCardPriorityOptions(selectedId) {
+    const select = document.getElementById('cardPriority');
+    select.innerHTML = '<option value="">None</option>';
+    allPriorities.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        opt.style.color = p.color;
+        if (p.id === selectedId) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function renderPriorityChip(priorityId) {
+    if (!priorityId) return '';
+    const p = allPriorities.find(x => x.id === priorityId);
+    if (!p) return '';
+    return `<span class="priority-chip" style="background:${p.color}">${escapeHtml(p.name)}</span>`;
+}
+
+function openPriorityManager() {
+    renderPriorityList();
+    new bootstrap.Modal(document.getElementById('priorityModal')).show();
+}
+
+function renderPriorityList() {
+    const container = document.getElementById('priorityList');
+    if (allPriorities.length === 0) {
+        container.innerHTML = '<p class="text-muted">No priorities yet.</p>';
+        return;
+    }
+    container.innerHTML = allPriorities.map(p => `
+        <div class="label-item" data-id="${p.id}">
+            <div class="label-preview" style="background:${p.color}"></div>
+            <input type="text" value="${escapeHtml(p.name)}" data-field="name" />
+            <input type="color" value="${p.color}" data-field="color" style="width:36px;height:28px;padding:0;border:none;" />
+            <button onclick="updatePriority('${p.id}')" title="Save">💾</button>
+            <button onclick="deletePriority('${p.id}')" title="Delete">🗑️</button>
+        </div>
+    `).join('');
+}
+
+async function createPriority() {
+    const name = document.getElementById('newPriorityName').value.trim();
+    const color = document.getElementById('newPriorityColor').value;
+    if (!name) { alert('Priority name is required'); return; }
+
+    await fetch(API.priorities, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+    });
+
+    document.getElementById('newPriorityName').value = '';
+    await loadPriorities();
+    renderPriorityList();
+}
+
+async function updatePriority(id) {
+    const item = document.querySelector(`#priorityList .label-item[data-id="${id}"]`);
+    const name = item.querySelector('[data-field="name"]').value.trim();
+    const color = item.querySelector('[data-field="color"]').value;
+    if (!name) { alert('Priority name is required'); return; }
+
+    await fetch(`${API.priorities}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+    });
+
+    await loadPriorities();
+    renderPriorityList();
+    renderCards();
+}
+
+async function deletePriority(id) {
+    if (!confirm('Delete this priority? It will be removed from all cards.')) return;
+    await fetch(`${API.priorities}/${id}`, { method: 'DELETE' });
+    await loadPriorities();
+    renderPriorityList();
     await loadCards();
 }
 

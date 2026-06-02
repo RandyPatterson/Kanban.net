@@ -31,6 +31,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
     const url = new URL(e.request.url);
 
+    // Only GET requests are cacheable; let the browser handle the rest
+    if (e.request.method !== 'GET') {
+        return;
+    }
+
     // API calls: always go to network (data must be fresh)
     if (url.pathname.startsWith('/api/')) {
         e.respondWith(fetch(e.request));

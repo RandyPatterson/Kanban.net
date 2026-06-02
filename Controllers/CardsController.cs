@@ -68,6 +68,7 @@ public class CardsController : ControllerBase
         card.Title = updated.Title;
         card.Description = updated.Description;
         card.LabelIds = updated.LabelIds ?? new List<string>();
+        card.PriorityId = updated.PriorityId;
         card.UpdatedAt = DateTime.UtcNow;
 
         await _storage.SaveAsync(store);

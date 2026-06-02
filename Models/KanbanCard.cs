@@ -7,6 +7,7 @@ public class KanbanCard
     public string Description { get; set; } = string.Empty;
     public string Column { get; set; } = "todo";
     public List<string> LabelIds { get; set; } = new();
+    public string? PriorityId { get; set; }
     public int Position { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

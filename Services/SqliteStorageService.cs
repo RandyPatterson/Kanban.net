@@ -65,7 +65,14 @@ public class SqliteStorageService
                 ColumnName  TEXT NOT NULL DEFAULT 'todo',
                 Position    INTEGER NOT NULL DEFAULT 0,
                 CreatedAt   TEXT NOT NULL,
-                UpdatedAt   TEXT NOT NULL
+                UpdatedAt   TEXT NOT NULL,
+                PriorityId  TEXT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS Priorities (
+                Id    TEXT PRIMARY KEY,
+                Name  TEXT NOT NULL,
+                Color TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS CardLabels (
@@ -87,6 +94,27 @@ public class SqliteStorageService
             );
         ";
         cmd.ExecuteNonQuery();
+
+        // Ensure PriorityId column exists on pre-existing Cards tables.
+        using var pragma = conn.CreateCommand();
+        pragma.CommandText = "PRAGMA table_info(Cards);";
+        var hasPriority = false;
+        using (var r = pragma.ExecuteReader())
+        {
+            while (r.Read())
+            {
+                if (string.Equals(r.GetString(1), "PriorityId", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasPriority = true; break;
+                }
+            }
+        }
+        if (!hasPriority)
+        {
+            using var alter = conn.CreateCommand();
+            alter.CommandText = "ALTER TABLE Cards ADD COLUMN PriorityId TEXT NULL;";
+            alter.ExecuteNonQuery();
+        }
     }
 
     private void MigrateFromJsonIfNeeded()
@@ -219,10 +247,25 @@ public class SqliteStorageService
             }
         }
 
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT Id, Name, Color FROM Priorities;";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                store.Priorities.Add(new KanbanPriority
+                {
+                    Id = reader.GetString(0),
+                    Name = reader.GetString(1),
+                    Color = reader.GetString(2)
+                });
+            }
+        }
+
         var cardsById = new Dictionary<string, KanbanCard>();
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"SELECT Id, Title, Description, ColumnName, Position, CreatedAt, UpdatedAt
+            cmd.CommandText = @"SELECT Id, Title, Description, ColumnName, Position, CreatedAt, UpdatedAt, PriorityId
                                 FROM Cards ORDER BY ColumnName, Position;";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -235,7 +278,8 @@ public class SqliteStorageService
                     Column = reader.GetString(3),
                     Position = reader.GetInt32(4),
                     CreatedAt = ParseDate(reader.GetString(5)),
-                    UpdatedAt = ParseDate(reader.GetString(6))
+                    UpdatedAt = ParseDate(reader.GetString(6)),
+                    PriorityId = reader.IsDBNull(7) ? null : reader.GetString(7)
                 };
                 cardsById[card.Id] = card;
                 store.Cards.Add(card);
@@ -268,7 +312,7 @@ public class SqliteStorageService
         using (var cmd = conn.CreateCommand())
         {
             cmd.Transaction = tx;
-            cmd.CommandText = "DELETE FROM CardLabels; DELETE FROM Cards; DELETE FROM Labels; DELETE FROM Columns;";
+            cmd.CommandText = "DELETE FROM CardLabels; DELETE FROM Cards; DELETE FROM Labels; DELETE FROM Columns; DELETE FROM Priorities;";
             cmd.ExecuteNonQuery();
         }
 
@@ -305,12 +349,29 @@ public class SqliteStorageService
             }
         }
 
+        using (var insertPriority = conn.CreateCommand())
+        {
+            insertPriority.Transaction = tx;
+            insertPriority.CommandText = "INSERT INTO Priorities (Id, Name, Color) VALUES ($id, $name, $color);";
+            var pId = insertPriority.CreateParameter(); pId.ParameterName = "$id"; insertPriority.Parameters.Add(pId);
+            var pName = insertPriority.CreateParameter(); pName.ParameterName = "$name"; insertPriority.Parameters.Add(pName);
+            var pColor = insertPriority.CreateParameter(); pColor.ParameterName = "$color"; insertPriority.Parameters.Add(pColor);
+
+            foreach (var priority in store.Priorities)
+            {
+                pId.Value = priority.Id;
+                pName.Value = priority.Name ?? string.Empty;
+                pColor.Value = priority.Color ?? string.Empty;
+                insertPriority.ExecuteNonQuery();
+            }
+        }
+
         using (var insertCard = conn.CreateCommand())
         using (var insertCardLabel = conn.CreateCommand())
         {
             insertCard.Transaction = tx;
-            insertCard.CommandText = @"INSERT INTO Cards (Id, Title, Description, ColumnName, Position, CreatedAt, UpdatedAt)
-                                       VALUES ($id, $title, $desc, $col, $pos, $created, $updated);";
+            insertCard.CommandText = @"INSERT INTO Cards (Id, Title, Description, ColumnName, Position, CreatedAt, UpdatedAt, PriorityId)
+                                       VALUES ($id, $title, $desc, $col, $pos, $created, $updated, $priority);";
             var cId = insertCard.CreateParameter(); cId.ParameterName = "$id"; insertCard.Parameters.Add(cId);
             var cTitle = insertCard.CreateParameter(); cTitle.ParameterName = "$title"; insertCard.Parameters.Add(cTitle);
             var cDesc = insertCard.CreateParameter(); cDesc.ParameterName = "$desc"; insertCard.Parameters.Add(cDesc);
@@ -318,6 +379,7 @@ public class SqliteStorageService
             var cPos = insertCard.CreateParameter(); cPos.ParameterName = "$pos"; insertCard.Parameters.Add(cPos);
             var cCreated = insertCard.CreateParameter(); cCreated.ParameterName = "$created"; insertCard.Parameters.Add(cCreated);
             var cUpdated = insertCard.CreateParameter(); cUpdated.ParameterName = "$updated"; insertCard.Parameters.Add(cUpdated);
+            var cPriority = insertCard.CreateParameter(); cPriority.ParameterName = "$priority"; insertCard.Parameters.Add(cPriority);
 
             insertCardLabel.Transaction = tx;
             insertCardLabel.CommandText = "INSERT OR IGNORE INTO CardLabels (CardId, LabelId) VALUES ($cardId, $labelId);";
@@ -325,6 +387,7 @@ public class SqliteStorageService
             var lLabelId = insertCardLabel.CreateParameter(); lLabelId.ParameterName = "$labelId"; insertCardLabel.Parameters.Add(lLabelId);
 
             var validLabelIds = new HashSet<string>(store.Labels.Select(l => l.Id));
+            var validPriorityIds = new HashSet<string>(store.Priorities.Select(p => p.Id));
 
             foreach (var card in store.Cards)
             {
@@ -335,6 +398,9 @@ public class SqliteStorageService
                 cPos.Value = card.Position;
                 cCreated.Value = card.CreatedAt.ToString("O");
                 cUpdated.Value = card.UpdatedAt.ToString("O");
+                cPriority.Value = (card.PriorityId != null && validPriorityIds.Contains(card.PriorityId))
+                    ? card.PriorityId
+                    : (object)DBNull.Value;
                 insertCard.ExecuteNonQuery();
 
                 if (card.LabelIds == null) continue;

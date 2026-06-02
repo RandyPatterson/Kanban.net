@@ -393,5 +393,5 @@ FodyWeavers.xsd
 *.msp
 
 ###  ASP.NET  ###
-# Application data folder used at runtime
-App_Data/*.json
+# Application data folder used at runtime — do not commit data files
+App_Data/

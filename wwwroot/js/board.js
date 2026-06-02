@@ -207,11 +207,13 @@ async function deleteCardDirect(id) {
 
 // ── Drag & Drop ──
 function setupDragAndDrop() {
-    document.querySelectorAll('.card-list').forEach(list => {
-        list.addEventListener('dragover', handleDragOver);
-        list.addEventListener('dragenter', handleDragEnter);
-        list.addEventListener('dragleave', handleDragLeave);
-        list.addEventListener('drop', handleDrop);
+    // Bind to the whole column so the entire column is a drop target,
+    // not just the narrow card-list bounds.
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        col.addEventListener('dragover', handleDragOver);
+        col.addEventListener('dragenter', handleDragEnter);
+        col.addEventListener('dragleave', handleDragLeave);
+        col.addEventListener('drop', handleDrop);
     });
 }
 
@@ -233,14 +235,14 @@ function handleDragEnd() {
 
 function handleDragEnter(e) {
     e.preventDefault();
-    const list = e.target.closest('.card-list');
-    if (list) list.classList.add('drag-over');
+    const col = e.target.closest('.kanban-column');
+    if (col) col.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
-    const list = e.target.closest('.card-list');
-    if (list && !list.contains(e.relatedTarget)) {
-        list.classList.remove('drag-over');
+    const col = e.target.closest('.kanban-column');
+    if (col && !col.contains(e.relatedTarget)) {
+        col.classList.remove('drag-over');
     }
 }
 
@@ -248,10 +250,14 @@ function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    const list = e.target.closest('.card-list');
+    const col = e.target.closest('.kanban-column');
+    if (!col) return;
+    const list = col.querySelector('.card-list');
     if (!list) return;
 
-    // Remove existing placeholders
+    col.classList.add('drag-over');
+
+    // Remove existing placeholders (across all columns)
     document.querySelectorAll('.drop-placeholder').forEach(el => el.remove());
 
     const afterElement = getDragAfterElement(list, e.clientY);
@@ -267,14 +273,16 @@ function handleDragOver(e) {
 
 async function handleDrop(e) {
     e.preventDefault();
-    const list = e.target.closest('.card-list');
+    const col = e.target.closest('.kanban-column');
+    if (!col) return;
+    const list = col.querySelector('.card-list');
     if (!list) return;
 
-    list.classList.remove('drag-over');
+    col.classList.remove('drag-over');
     document.querySelectorAll('.drop-placeholder').forEach(el => el.remove());
 
     const cardId = e.dataTransfer.getData('text/plain');
-    const column = list.closest('.kanban-column').dataset.column;
+    const column = col.dataset.column;
 
     // Calculate position
     const visibleCards = Array.from(list.querySelectorAll('.kanban-card:not(.dragging):not(.hidden)'));

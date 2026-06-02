@@ -140,11 +140,18 @@ body {
     overflow-y: auto;
     flex: 1;
     min-height: 60px;
+    /* Ensure the list fills the column so the entire column
+       below the last card is a valid drop target. */
+    display: flex;
+    flex-direction: column;
 }
 
-.card-list.drag-over {
-    background: rgba(0, 121, 191, 0.08);
-    border-radius: 4px;
+/* Highlight the whole column while dragging over it, so the
+   visual drop target matches the actual drop hit area. */
+.kanban-column.drag-over {
+    background: rgba(0, 121, 191, 0.10);
+    outline: 2px dashed rgba(0, 121, 191, 0.55);
+    outline-offset: -4px;
 }
 
 /* Cards — post-it note style */

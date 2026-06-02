@@ -112,6 +112,12 @@ function renderCards() {
             el.draggable = true;
             el.dataset.id = card.id;
 
+            const priority = card.priorityId ? allPriorities.find(p => p.id === card.priorityId) : null;
+            const cardColor = priority ? priority.color : '#0079bf';
+            const c1 = hexToRgba(cardColor, 0.1);
+            const c2 = hexToRgba(cardColor, 0.3);
+            el.style.background = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+
             const labelsHtml = card.labelIds
                 .map(lid => {
                     const label = allLabels.find(l => l.id === lid);
@@ -640,6 +646,16 @@ async function deleteColumn(id) {
 }
 
 // ── Util ──
+function hexToRgba(hex, alpha) {
+    if (!hex) return `rgba(0,121,191,${alpha})`;
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function renderMarkdown(text) {
     if (typeof marked !== 'undefined') {
         marked.setOptions({ breaks: true, gfm: true });

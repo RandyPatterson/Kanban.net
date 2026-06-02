@@ -29,8 +29,8 @@ body {
 
 /* Toolbar */
 .kanban-toolbar {
-    background: var(--header-bg);
-    color: white;
+    background: rgba(0, 103, 255, 0.4);
+    color: var(--text-primary);
     padding: 12px 24px;
     display: flex;
     align-items: center;
@@ -53,30 +53,30 @@ body {
 }
 
 .toolbar-manage {
-    background: var(--header-bg);
+    background: rgba(0, 103, 255, 0.4);
     padding: 8px 24px 12px;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
     justify-content: flex-end;
-    border-top: 1px solid rgba(255,255,255,0.15);
+    border-top: 1px solid rgba(0,0,0,0.08);
 }
 
 .toolbar-controls input,
 .toolbar-controls select {
     max-width: 200px;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.15);
+    color: var(--text-primary);
 }
 
-.toolbar-controls input::placeholder { color: rgba(255,255,255,0.7); }
+.toolbar-controls input::placeholder { color: var(--text-secondary); }
 .toolbar-controls select option { color: var(--text-primary); background: white; }
 .toolbar-controls input:focus,
 .toolbar-controls select:focus {
-    background: rgba(255,255,255,0.3);
-    border-color: rgba(255,255,255,0.5);
-    color: white;
+    background: #ffffff;
+    border-color: rgba(0,0,0,0.3);
+    color: var(--text-primary);
     box-shadow: none;
 }
 

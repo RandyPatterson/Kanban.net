@@ -8,9 +8,9 @@ namespace kanban.net.Controllers;
 [Route("api/[controller]")]
 public class CardsController : ControllerBase
 {
-    private readonly JsonStorageService _storage;
+    private readonly SqliteStorageService _storage;
 
-    public CardsController(JsonStorageService storage)
+    public CardsController(SqliteStorageService storage)
     {
         _storage = storage;
     }

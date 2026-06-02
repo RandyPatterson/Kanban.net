@@ -13,7 +13,7 @@ builder.Host.UseWindowsService();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddSingleton<JsonStorageService>();
+builder.Services.AddSingleton<SqliteStorageService>();
 
 var app = builder.Build();
 

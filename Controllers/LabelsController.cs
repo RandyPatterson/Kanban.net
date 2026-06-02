@@ -8,9 +8,9 @@ namespace kanban.net.Controllers;
 [Route("api/[controller]")]
 public class LabelsController : ControllerBase
 {
-    private readonly JsonStorageService _storage;
+    private readonly SqliteStorageService _storage;
 
-    public LabelsController(JsonStorageService storage)
+    public LabelsController(SqliteStorageService storage)
     {
         _storage = storage;
     }

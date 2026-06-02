@@ -83,9 +83,17 @@ function renderCards() {
     columns.forEach(col => {
         const list = document.getElementById(`list-${col}`);
         if (!list) return;
+        const priorityOrdinal = (id) => {
+            if (!id) return -1;
+            const idx = allPriorities.findIndex(p => p.id === id);
+            return idx === -1 ? -1 : idx;
+        };
         const cards = allCards
             .filter(c => c.column === col)
-            .sort((a, b) => a.position - b.position);
+            .sort((a, b) => {
+                const diff = priorityOrdinal(b.priorityId) - priorityOrdinal(a.priorityId);
+                return diff !== 0 ? diff : a.position - b.position;
+            });
 
         list.innerHTML = '';
         let visibleCount = 0;

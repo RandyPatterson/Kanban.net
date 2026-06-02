@@ -10,36 +10,12 @@
                 <option value="">All Labels</option>
             </select>
             <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
         </div>
     </div>
 
     <!-- Board -->
-    <div class="kanban-board">
-        <div class="kanban-column" data-column="todo">
-            <div class="column-header">
-                <span class="column-title">📝 To Do</span>
-                <span class="card-count" id="count-todo">0</span>
-                <button class="btn-add-card" onclick="openCardModal('todo')">+</button>
-            </div>
-            <div class="card-list" id="list-todo"></div>
-        </div>
-        <div class="kanban-column" data-column="inprogress">
-            <div class="column-header">
-                <span class="column-title">🔄 In Progress</span>
-                <span class="card-count" id="count-inprogress">0</span>
-                <button class="btn-add-card" onclick="openCardModal('inprogress')">+</button>
-            </div>
-            <div class="card-list" id="list-inprogress"></div>
-        </div>
-        <div class="kanban-column" data-column="done">
-            <div class="column-header">
-                <span class="column-title">✅ Done</span>
-                <span class="card-count" id="count-done">0</span>
-                <button class="btn-add-card" onclick="openCardModal('done')">+</button>
-            </div>
-            <div class="card-list" id="list-done"></div>
-        </div>
-    </div>
+    <div class="kanban-board" id="kanbanBoard"></div>
 </div>
 
 <!-- Card Modal -->
@@ -91,6 +67,28 @@
                     <input type="text" class="form-control form-control-sm" id="newLabelName" placeholder="Label name" />
                     <input type="color" class="form-control form-control-color form-control-sm" id="newLabelColor" value="#3498db" />
                     <button class="btn btn-sm btn-primary" onclick="createLabel()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Column Manager Modal -->
+<div class="modal fade" id="columnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Columns</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Drag the ⠿ handle to reorder columns.</p>
+                <div id="columnList" class="mb-3"></div>
+                <hr />
+                <h6>Add New Column</h6>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" id="newColumnTitle" placeholder="Column title" />
+                    <button class="btn btn-sm btn-primary" onclick="createColumn()">Add</button>
                 </div>
             </div>
         </div>

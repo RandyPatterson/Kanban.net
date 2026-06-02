@@ -32,6 +32,7 @@ public class SqliteStorageService
 
         InitializeSchema();
         MigrateFromJsonIfNeeded();
+        SeedDefaultColumnsIfNeeded();
     }
 
     private SqliteConnection OpenConnection()
@@ -78,6 +79,12 @@ public class SqliteStorageService
             CREATE INDEX IF NOT EXISTS IX_Cards_Column   ON Cards(ColumnName);
             CREATE INDEX IF NOT EXISTS IX_Cards_Position ON Cards(ColumnName, Position);
             CREATE INDEX IF NOT EXISTS IX_CardLabels_LabelId ON CardLabels(LabelId);
+
+            CREATE TABLE IF NOT EXISTS Columns (
+                Id       TEXT PRIMARY KEY,
+                Title    TEXT NOT NULL,
+                Position INTEGER NOT NULL DEFAULT 0
+            );
         ";
         cmd.ExecuteNonQuery();
     }
@@ -85,7 +92,6 @@ public class SqliteStorageService
     private void MigrateFromJsonIfNeeded()
     {
         if (!File.Exists(_legacyJsonPath)) return;
-
         // Only import if the database is empty.
         using (var conn = OpenConnection())
         using (var check = conn.CreateCommand())
@@ -118,6 +124,40 @@ public class SqliteStorageService
         }
     }
 
+    private void SeedDefaultColumnsIfNeeded()
+    {
+        using var conn = OpenConnection();
+        using (var check = conn.CreateCommand())
+        {
+            check.CommandText = "SELECT COUNT(*) FROM Columns;";
+            var count = Convert.ToInt64(check.ExecuteScalar());
+            if (count > 0) return;
+        }
+
+        var defaults = new[]
+        {
+            new KanbanColumn { Id = "todo",       Title = "📝 To Do",       Position = 0 },
+            new KanbanColumn { Id = "inprogress", Title = "🔄 In Progress", Position = 1 },
+            new KanbanColumn { Id = "done",       Title = "✅ Done",        Position = 2 }
+        };
+
+        using var tx = conn.BeginTransaction();
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "INSERT INTO Columns (Id, Title, Position) VALUES ($id, $title, $pos);";
+        var pId = cmd.CreateParameter(); pId.ParameterName = "$id"; cmd.Parameters.Add(pId);
+        var pTitle = cmd.CreateParameter(); pTitle.ParameterName = "$title"; cmd.Parameters.Add(pTitle);
+        var pPos = cmd.CreateParameter(); pPos.ParameterName = "$pos"; cmd.Parameters.Add(pPos);
+        foreach (var c in defaults)
+        {
+            pId.Value = c.Id;
+            pTitle.Value = c.Title;
+            pPos.Value = c.Position;
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
     public async Task<KanbanStore> LoadAsync()
     {
         await _lock.WaitAsync();
@@ -148,6 +188,21 @@ public class SqliteStorageService
     {
         var store = new KanbanStore();
         using var conn = OpenConnection();
+
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT Id, Title, Position FROM Columns ORDER BY Position;";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                store.Columns.Add(new KanbanColumn
+                {
+                    Id = reader.GetString(0),
+                    Title = reader.GetString(1),
+                    Position = reader.GetInt32(2)
+                });
+            }
+        }
 
         using (var cmd = conn.CreateCommand())
         {
@@ -213,8 +268,24 @@ public class SqliteStorageService
         using (var cmd = conn.CreateCommand())
         {
             cmd.Transaction = tx;
-            cmd.CommandText = "DELETE FROM CardLabels; DELETE FROM Cards; DELETE FROM Labels;";
+            cmd.CommandText = "DELETE FROM CardLabels; DELETE FROM Cards; DELETE FROM Labels; DELETE FROM Columns;";
             cmd.ExecuteNonQuery();
+        }
+
+        using (var insertCol = conn.CreateCommand())
+        {
+            insertCol.Transaction = tx;
+            insertCol.CommandText = "INSERT INTO Columns (Id, Title, Position) VALUES ($id, $title, $pos);";
+            var pId = insertCol.CreateParameter(); pId.ParameterName = "$id"; insertCol.Parameters.Add(pId);
+            var pTitle = insertCol.CreateParameter(); pTitle.ParameterName = "$title"; insertCol.Parameters.Add(pTitle);
+            var pPos = insertCol.CreateParameter(); pPos.ParameterName = "$pos"; insertCol.Parameters.Add(pPos);
+            foreach (var c in store.Columns)
+            {
+                pId.Value = c.Id;
+                pTitle.Value = c.Title ?? string.Empty;
+                pPos.Value = c.Position;
+                insertCol.ExecuteNonQuery();
+            }
         }
 
         using (var insertLabel = conn.CreateCommand())

@@ -1,18 +1,20 @@
 // Kanban Board JavaScript
 let allCards = [];
 let allLabels = [];
+let allColumns = [];
 let draggedCard = null;
 
 const API = {
     cards: '/api/cards',
-    labels: '/api/labels'
+    labels: '/api/labels',
+    columns: '/api/columns'
 };
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadColumns();
     await loadLabels();
     await loadCards();
-    setupDragAndDrop();
     setupSearch();
 });
 
@@ -29,14 +31,50 @@ async function loadLabels() {
     renderLabelFilter();
 }
 
+async function loadColumns() {
+    const res = await fetch(API.columns);
+    allColumns = await res.json();
+    renderBoard();
+}
+
+// ── Board layout (dynamic columns) ──
+function renderBoard() {
+    const board = document.getElementById('kanbanBoard');
+    if (!board) {
+        console.error("renderBoard: '#kanbanBoard' element not found in DOM. The page may not contain the Kanban board markup, or a stale cached page is being served by the service worker.");
+        return;
+    }
+    board.innerHTML = '';
+    allColumns
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .forEach(col => {
+            const colEl = document.createElement('div');
+            colEl.className = 'kanban-column';
+            colEl.dataset.column = col.id;
+            colEl.innerHTML = `
+                <div class="column-header">
+                    <span class="column-title">${escapeHtml(col.title)}</span>
+                    <span class="card-count" id="count-${col.id}">0</span>
+                    <button class="btn-add-card" title="Add card">+</button>
+                </div>
+                <div class="card-list" id="list-${col.id}"></div>
+            `;
+            colEl.querySelector('.btn-add-card').addEventListener('click', () => openCardModal(col.id));
+            board.appendChild(colEl);
+        });
+    setupDragAndDrop();
+}
+
 // ── Rendering ──
 function renderCards() {
-    const columns = ['todo', 'inprogress', 'done'];
+    const columns = allColumns.map(c => c.id);
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const labelFilter = document.getElementById('labelFilter').value;
 
     columns.forEach(col => {
         const list = document.getElementById(`list-${col}`);
+        if (!list) return;
         const cards = allCards
             .filter(c => c.column === col)
             .sort((a, b) => a.position - b.position);
@@ -84,7 +122,8 @@ function renderCards() {
             list.appendChild(el);
         });
 
-        document.getElementById(`count-${col}`).textContent = visibleCount;
+        const countEl = document.getElementById(`count-${col}`);
+        if (countEl) countEl.textContent = visibleCount;
     });
 }
 
@@ -380,6 +419,115 @@ async function deleteLabel(id) {
     await fetch(`${API.labels}/${id}`, { method: 'DELETE' });
     await loadLabels();
     renderLabelList();
+    await loadCards();
+}
+
+// ── Column Management ──
+function openColumnManager() {
+    renderColumnList();
+    new bootstrap.Modal(document.getElementById('columnModal')).show();
+}
+
+function renderColumnList() {
+    const container = document.getElementById('columnList');
+    if (allColumns.length === 0) {
+        container.innerHTML = '<p class="text-muted">No columns yet.</p>';
+        return;
+    }
+    const ordered = allColumns.slice().sort((a, b) => a.position - b.position);
+    container.innerHTML = ordered.map(c => {
+        const count = allCards.filter(card => card.column === c.id).length;
+        return `
+        <div class="column-item" draggable="true" data-id="${c.id}">
+            <span class="drag-handle" title="Drag to reorder">⠿</span>
+            <input type="text" value="${escapeHtml(c.title)}" data-field="title" />
+            <span class="text-muted small">${count} card${count === 1 ? '' : 's'}</span>
+            <button onclick="updateColumn('${c.id}')" title="Save">💾</button>
+            <button onclick="deleteColumn('${c.id}')" title="Delete">🗑️</button>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('.column-item').forEach(item => {
+        item.addEventListener('dragstart', handleColumnDragStart);
+        item.addEventListener('dragover', handleColumnDragOver);
+        item.addEventListener('drop', handleColumnDrop);
+        item.addEventListener('dragend', handleColumnDragEnd);
+    });
+}
+
+let draggedColumnItem = null;
+function handleColumnDragStart(e) {
+    draggedColumnItem = e.currentTarget;
+    e.dataTransfer.effectAllowed = 'move';
+    draggedColumnItem.classList.add('dragging');
+}
+function handleColumnDragOver(e) {
+    e.preventDefault();
+    const target = e.currentTarget;
+    if (!draggedColumnItem || target === draggedColumnItem) return;
+    const rect = target.getBoundingClientRect();
+    const after = (e.clientY - rect.top) > rect.height / 2;
+    target.parentNode.insertBefore(draggedColumnItem, after ? target.nextSibling : target);
+}
+function handleColumnDrop(e) { e.preventDefault(); }
+async function handleColumnDragEnd() {
+    if (draggedColumnItem) draggedColumnItem.classList.remove('dragging');
+    draggedColumnItem = null;
+    const orderedIds = Array.from(document.querySelectorAll('#columnList .column-item'))
+        .map(el => el.dataset.id);
+    await fetch(`${API.columns}/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderedIds)
+    });
+    await loadColumns();
+    await loadCards();
+    renderColumnList();
+}
+
+async function createColumn() {
+    const titleEl = document.getElementById('newColumnTitle');
+    const title = titleEl.value.trim();
+    if (!title) { alert('Column title is required'); return; }
+    const res = await fetch(API.columns, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+    });
+    if (!res.ok) { alert('Failed to create column'); return; }
+    titleEl.value = '';
+    await loadColumns();
+    renderColumnList();
+    await loadCards();
+}
+
+async function updateColumn(id) {
+    const item = document.querySelector(`.column-item[data-id="${id}"]`);
+    const title = item.querySelector('[data-field="title"]').value.trim();
+    if (!title) { alert('Column title is required'); return; }
+    const res = await fetch(`${API.columns}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+    });
+    if (!res.ok) { alert('Failed to update column'); return; }
+    await loadColumns();
+    renderColumnList();
+    await loadCards();
+}
+
+async function deleteColumn(id) {
+    if (!confirm('Delete this column?')) return;
+    let res = await fetch(`${API.columns}/${id}`, { method: 'DELETE' });
+    if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        const n = body.cardCount ?? '';
+        if (!confirm(`This column has ${n} card(s). Delete the column AND its cards?`)) return;
+        res = await fetch(`${API.columns}/${id}?force=true`, { method: 'DELETE' });
+    }
+    if (!res.ok && res.status !== 204) { alert('Failed to delete column'); return; }
+    await loadColumns();
+    renderColumnList();
     await loadCards();
 }
 

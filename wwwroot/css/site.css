@@ -179,6 +179,11 @@ body {
     font-family: 'Segoe Print', 'Comic Sans MS', 'Patrick Hand', cursive, sans-serif;
     min-height: 60px;
     transform: rotate(-0.5deg);
+    /* Keep the card at its natural content height. Without this, cards act as
+       flex items in the .card-list column and shrink when the column fills up,
+       causing the card body to overflow into the next card. */
+    flex-shrink: 0;
+    overflow: hidden;
 }
 
 /* Folded corner effect */

@@ -15,11 +15,14 @@ public class CardsController : ControllerBase
 		_storage = storage;
 	}
 
-	[HttpGet]
-	public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] string? labelId)
-	{
-		var store = await _storage.LoadAsync();
-		var cards = store.Cards.AsEnumerable();
+    private static string ResolveProjectId(string? projectId) =>
+        string.IsNullOrWhiteSpace(projectId) ? "default" : projectId;
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] string? labelId, [FromQuery] string? projectId)
+    {
+        var store = await _storage.LoadAsync(ResolveProjectId(projectId));
+        var cards = store.Cards.AsEnumerable();
 
 		if (!string.IsNullOrWhiteSpace(search))
 		{
@@ -37,13 +40,14 @@ public class CardsController : ControllerBase
 		return Ok(cards.OrderBy(c => c.Position).ToList());
 	}
 
-	[HttpPost]
-	public async Task<IActionResult> Create([FromBody] KanbanCard card)
-	{
-		if (string.IsNullOrWhiteSpace(card.Title))
-			return BadRequest(new { error = "Title is required" });
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] KanbanCard card, [FromQuery] string? projectId)
+    {
+        if (string.IsNullOrWhiteSpace(card.Title))
+            return BadRequest(new { error = "Title is required" });
 
-		var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
 
 		card.Id = Guid.NewGuid().ToString();
 		card.CreatedAt = DateTime.UtcNow;
@@ -52,18 +56,19 @@ public class CardsController : ControllerBase
 		var columnCards = store.Cards.Where(c => c.Column == card.Column);
 		card.Position = columnCards.Any() ? columnCards.Max(c => c.Position) + 1 : 0;
 
-		store.Cards.Add(card);
-		await _storage.SaveAsync(store);
+        store.Cards.Add(card);
+        await _storage.SaveAsync(store, pid);
 
 		return CreatedAtAction(nameof(GetAll), new { }, card);
 	}
 
-	[HttpPut("{id}")]
-	public async Task<IActionResult> Update(string id, [FromBody] KanbanCard updated)
-	{
-		var store = await _storage.LoadAsync();
-		var card = store.Cards.FirstOrDefault(c => c.Id == id);
-		if (card == null) return NotFound();
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(string id, [FromBody] KanbanCard updated, [FromQuery] string? projectId)
+    {
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
+        var card = store.Cards.FirstOrDefault(c => c.Id == id);
+        if (card == null) return NotFound();
 
 		card.Title = updated.Title;
 		card.Description = updated.Description;
@@ -71,16 +76,17 @@ public class CardsController : ControllerBase
 		card.PriorityId = updated.PriorityId;
 		card.UpdatedAt = DateTime.UtcNow;
 
-		await _storage.SaveAsync(store);
-		return Ok(card);
-	}
+        await _storage.SaveAsync(store, pid);
+        return Ok(card);
+    }
 
-	[HttpPut("{id}/move")]
-	public async Task<IActionResult> Move(string id, [FromBody] MoveRequest request)
-	{
-		var store = await _storage.LoadAsync();
-		var card = store.Cards.FirstOrDefault(c => c.Id == id);
-		if (card == null) return NotFound();
+    [HttpPut("{id}/move")]
+    public async Task<IActionResult> Move(string id, [FromBody] MoveRequest request, [FromQuery] string? projectId)
+    {
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
+        var card = store.Cards.FirstOrDefault(c => c.Id == id);
+        if (card == null) return NotFound();
 
 		var oldColumn = card.Column;
 		card.Column = request.Column;
@@ -108,16 +114,17 @@ public class CardsController : ControllerBase
 				oldCards[i].Position = i;
 		}
 
-		await _storage.SaveAsync(store);
-		return Ok(card);
-	}
+        await _storage.SaveAsync(store, pid);
+        return Ok(card);
+    }
 
-	[HttpDelete("{id}")]
-	public async Task<IActionResult> Delete(string id)
-	{
-		var store = await _storage.LoadAsync();
-		var card = store.Cards.FirstOrDefault(c => c.Id == id);
-		if (card == null) return NotFound();
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id, [FromQuery] string? projectId)
+    {
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
+        var card = store.Cards.FirstOrDefault(c => c.Id == id);
+        if (card == null) return NotFound();
 
 		store.Cards.Remove(card);
 
@@ -129,9 +136,9 @@ public class CardsController : ControllerBase
 		for (int i = 0; i < remaining.Count; i++)
 			remaining[i].Position = i;
 
-		await _storage.SaveAsync(store);
-		return NoContent();
-	}
+        await _storage.SaveAsync(store, pid);
+        return NoContent();
+    }
 }
 
 public class MoveRequest

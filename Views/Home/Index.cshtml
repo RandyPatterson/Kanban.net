@@ -12,9 +12,16 @@
         </div>
     </div>
     <div class="toolbar-manage">
-        <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
-        <button class="btn btn-sm btn-outline-secondary" onclick="openPriorityManager()">⚑ Priorities</button>
-        <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
+        <div class="project-selector">
+            <label for="projectSelect" class="project-selector-label">Project</label>
+            <select id="projectSelect" class="form-select form-select-sm" onchange="onProjectChange(this.value)"></select>
+        </div>
+        <div class="manage-buttons">
+            <button class="btn btn-sm btn-outline-secondary" onclick="openProjectManager()">📁 Projects</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openLabelManager()">🏷️ Labels</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openPriorityManager()">⚑ Priorities</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
+        </div>
     </div>
 
     <!-- Board -->
@@ -120,6 +127,48 @@
                     <input type="color" class="form-control form-control-color form-control-sm" id="newPriorityColor" value="#e67e22" />
                     <button class="btn btn-sm btn-primary" onclick="createPriority()">Add</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Manager Modal -->
+<div class="modal fade" id="projectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Projects</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2">Each project has its own columns, cards, labels, and priorities.</p>
+                <div id="projectList" class="mb-3"></div>
+                <hr />
+                <h6>Add New Project</h6>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" id="newProjectName" placeholder="Project name" />
+                    <button class="btn btn-sm btn-primary" onclick="createProject()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Project Warning Modal -->
+<div class="modal fade" id="projectDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">⚠️ Delete Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the project <strong id="deleteProjectName"></strong>?</p>
+                <p class="text-danger mb-0">This permanently removes <strong>all columns, cards, labels, and priorities</strong> that belong to this project. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDeleteProject" onclick="confirmDeleteProject()">Delete Project</button>
             </div>
         </div>
     </div>

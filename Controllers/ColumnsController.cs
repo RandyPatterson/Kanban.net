@@ -15,61 +15,68 @@ public class ColumnsController : ControllerBase
         _storage = storage;
     }
 
+    private static string ResolveProjectId(string? projectId) =>
+        string.IsNullOrWhiteSpace(projectId) ? "default" : projectId;
+
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] string? projectId)
     {
-        var store = await _storage.LoadAsync();
+        var store = await _storage.LoadAsync(ResolveProjectId(projectId));
         return Ok(store.Columns.OrderBy(c => c.Position).ToList());
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] KanbanColumn column)
+    public async Task<IActionResult> Create([FromBody] KanbanColumn column, [FromQuery] string? projectId)
     {
         if (string.IsNullOrWhiteSpace(column.Title))
             return BadRequest(new { error = "Title is required" });
 
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         column.Id = Guid.NewGuid().ToString();
         column.Position = store.Columns.Count == 0 ? 0 : store.Columns.Max(c => c.Position) + 1;
         store.Columns.Add(column);
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return CreatedAtAction(nameof(GetAll), new { }, column);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] KanbanColumn updated)
+    public async Task<IActionResult> Update(string id, [FromBody] KanbanColumn updated, [FromQuery] string? projectId)
     {
         if (string.IsNullOrWhiteSpace(updated.Title))
             return BadRequest(new { error = "Title is required" });
 
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         var col = store.Columns.FirstOrDefault(c => c.Id == id);
         if (col == null) return NotFound();
 
         col.Title = updated.Title;
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return Ok(col);
     }
 
     [HttpPut("reorder")]
-    public async Task<IActionResult> Reorder([FromBody] List<string> orderedIds)
+    public async Task<IActionResult> Reorder([FromBody] List<string> orderedIds, [FromQuery] string? projectId)
     {
         if (orderedIds == null) return BadRequest();
 
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         for (int i = 0; i < orderedIds.Count; i++)
         {
             var col = store.Columns.FirstOrDefault(c => c.Id == orderedIds[i]);
             if (col != null) col.Position = i;
         }
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return Ok(store.Columns.OrderBy(c => c.Position).ToList());
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id, [FromQuery] bool force = false)
+    public async Task<IActionResult> Delete(string id, [FromQuery] bool force = false, [FromQuery] string? projectId = null)
     {
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         var col = store.Columns.FirstOrDefault(c => c.Id == id);
         if (col == null) return NotFound();
 
@@ -90,7 +97,7 @@ public class ColumnsController : ControllerBase
         var ordered = store.Columns.OrderBy(c => c.Position).ToList();
         for (int i = 0; i < ordered.Count; i++) ordered[i].Position = i;
 
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return NoContent();
     }
 }

@@ -15,46 +15,52 @@ public class LabelsController : ControllerBase
         _storage = storage;
     }
 
+    private static string ResolveProjectId(string? projectId) =>
+        string.IsNullOrWhiteSpace(projectId) ? "default" : projectId;
+
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] string? projectId)
     {
-        var store = await _storage.LoadAsync();
+        var store = await _storage.LoadAsync(ResolveProjectId(projectId));
         return Ok(store.Labels);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] KanbanLabel label)
+    public async Task<IActionResult> Create([FromBody] KanbanLabel label, [FromQuery] string? projectId)
     {
         if (string.IsNullOrWhiteSpace(label.Name))
             return BadRequest(new { error = "Name is required" });
 
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
 
         label.Id = Guid.NewGuid().ToString();
         store.Labels.Add(label);
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
 
         return CreatedAtAction(nameof(GetAll), new { }, label);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(string id, [FromBody] KanbanLabel updated)
+    public async Task<IActionResult> Update(string id, [FromBody] KanbanLabel updated, [FromQuery] string? projectId)
     {
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         var label = store.Labels.FirstOrDefault(l => l.Id == id);
         if (label == null) return NotFound();
 
         label.Name = updated.Name;
         label.Color = updated.Color;
 
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return Ok(label);
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id)
+    public async Task<IActionResult> Delete(string id, [FromQuery] string? projectId)
     {
-        var store = await _storage.LoadAsync();
+        var pid = ResolveProjectId(projectId);
+        var store = await _storage.LoadAsync(pid);
         var label = store.Labels.FirstOrDefault(l => l.Id == id);
         if (label == null) return NotFound();
 
@@ -66,7 +72,7 @@ public class LabelsController : ControllerBase
             card.LabelIds.Remove(id);
         }
 
-        await _storage.SaveAsync(store);
+        await _storage.SaveAsync(store, pid);
         return NoContent();
     }
 }

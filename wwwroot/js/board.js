@@ -3,17 +3,36 @@ let allCards = [];
 let allLabels = [];
 let allColumns = [];
 let allPriorities = [];
+let allProjects = [];
+let currentProjectId = null;
+let pendingDeleteProjectId = null;
 let draggedCard = null;
 
 const API = {
     cards: '/api/cards',
     labels: '/api/labels',
     columns: '/api/columns',
-    priorities: '/api/priorities'
+    priorities: '/api/priorities',
+    projects: '/api/projects'
+};
+
+// Automatically scope every project-owned API call to the current project by
+// appending ?projectId=. The Projects endpoint itself is intentionally excluded.
+const _nativeFetch = window.fetch.bind(window);
+window.fetch = function (input, init) {
+    if (typeof input === 'string'
+        && input.startsWith('/api/')
+        && !input.startsWith(API.projects)
+        && currentProjectId) {
+        const sep = input.includes('?') ? '&' : '?';
+        input = `${input}${sep}projectId=${encodeURIComponent(currentProjectId)}`;
+    }
+    return _nativeFetch(input, init);
 };
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadProjects();
     await loadColumns();
     await loadLabels();
     await loadPriorities();
@@ -43,6 +62,50 @@ async function loadColumns() {
     const res = await fetch(API.columns);
     allColumns = await res.json();
     renderBoard();
+}
+
+// ── Projects ──
+async function loadProjects() {
+    const res = await fetch(API.projects);
+    allProjects = await res.json();
+
+    const saved = localStorage.getItem('currentProjectId');
+    if (saved && allProjects.some(p => p.id === saved)) {
+        currentProjectId = saved;
+    } else if (allProjects.length > 0) {
+        currentProjectId = allProjects[0].id;
+    } else {
+        currentProjectId = null;
+    }
+    if (currentProjectId) localStorage.setItem('currentProjectId', currentProjectId);
+    renderProjectSelect();
+}
+
+function renderProjectSelect() {
+    const select = document.getElementById('projectSelect');
+    if (!select) return;
+    select.innerHTML = '';
+    allProjects.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        select.appendChild(opt);
+    });
+    if (currentProjectId) select.value = currentProjectId;
+}
+
+async function onProjectChange(id) {
+    if (!id || id === currentProjectId) return;
+    currentProjectId = id;
+    localStorage.setItem('currentProjectId', id);
+    await reloadCurrentProject();
+}
+
+async function reloadCurrentProject() {
+    await loadColumns();
+    await loadLabels();
+    await loadPriorities();
+    await loadCards();
 }
 
 // ── Board layout (dynamic columns) ──
@@ -643,6 +706,110 @@ async function deleteColumn(id) {
     await loadColumns();
     renderColumnList();
     await loadCards();
+}
+
+// ── Project Management ──
+function openProjectManager() {
+    renderProjectList();
+    new bootstrap.Modal(document.getElementById('projectModal')).show();
+}
+
+function renderProjectList() {
+    const container = document.getElementById('projectList');
+    if (allProjects.length === 0) {
+        container.innerHTML = '<p class="text-muted">No projects yet.</p>';
+        return;
+    }
+    container.innerHTML = allProjects.map(p => {
+        const isCurrent = p.id === currentProjectId;
+        return `
+        <div class="label-item" data-id="${p.id}">
+            <input type="text" value="${escapeHtml(p.name)}" data-field="name" />
+            ${isCurrent ? '<span class="text-muted small">current</span>' : ''}
+            <button onclick="updateProject('${p.id}')" title="Save">💾</button>
+            <button onclick="deleteProject('${p.id}')" title="Delete">🗑️</button>
+        </div>`;
+    }).join('');
+}
+
+async function createProject() {
+    const input = document.getElementById('newProjectName');
+    const name = input.value.trim();
+    if (!name) { alert('Project name is required'); return; }
+
+    const res = await fetch(API.projects, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    });
+    if (!res.ok) { alert('Failed to create project'); return; }
+
+    const created = await res.json();
+    input.value = '';
+    await loadProjects();
+    renderProjectList();
+
+    // Switch to the newly created project.
+    if (created && created.id) {
+        currentProjectId = created.id;
+        localStorage.setItem('currentProjectId', currentProjectId);
+        renderProjectSelect();
+        await reloadCurrentProject();
+    }
+}
+
+async function updateProject(id) {
+    const item = document.querySelector(`#projectList .label-item[data-id="${id}"]`);
+    const name = item.querySelector('[data-field="name"]').value.trim();
+    if (!name) { alert('Project name is required'); return; }
+
+    const res = await fetch(`${API.projects}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    });
+    if (!res.ok) { alert('Failed to update project'); return; }
+
+    await loadProjects();
+    renderProjectList();
+}
+
+function deleteProject(id) {
+    if (allProjects.length <= 1) {
+        alert('You cannot delete the last remaining project.');
+        return;
+    }
+    const project = allProjects.find(p => p.id === id);
+    pendingDeleteProjectId = id;
+    document.getElementById('deleteProjectName').textContent = project ? project.name : '';
+    new bootstrap.Modal(document.getElementById('projectDeleteModal')).show();
+}
+
+async function confirmDeleteProject() {
+    const id = pendingDeleteProjectId;
+    if (!id) return;
+
+    const res = await fetch(`${API.projects}/${id}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 204) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || 'Failed to delete project');
+        return;
+    }
+
+    pendingDeleteProjectId = null;
+    bootstrap.Modal.getInstance(document.getElementById('projectDeleteModal'))?.hide();
+
+    const wasCurrent = id === currentProjectId;
+    await loadProjects();
+
+    // If the active project was removed, switch to whatever remains.
+    if (wasCurrent) {
+        currentProjectId = allProjects.length > 0 ? allProjects[0].id : null;
+        if (currentProjectId) localStorage.setItem('currentProjectId', currentProjectId);
+        renderProjectSelect();
+    }
+    await reloadCurrentProject();
+    renderProjectList();
 }
 
 // ── Util ──

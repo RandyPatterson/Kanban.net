@@ -58,8 +58,39 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
     border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.project-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-selector-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.project-selector select {
+    min-width: 160px;
+    max-width: 240px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.15);
+    color: var(--text-primary);
+}
+
+.project-selector select option { color: var(--text-primary); background: white; }
+
+.manage-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .toolbar-controls input,

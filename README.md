@@ -13,12 +13,12 @@ A lightweight Kanban board web application built with ASP.NET Core MVC and .NET 
 
 ## Tech Stack
 
-| Layer     | Technology                      |
-|-----------|---------------------------------|
-| Framework | ASP.NET Core MVC (.NET 10)      |
-| Frontend  | Bootstrap, jQuery, vanilla JS   |
-| Storage   | Local JSON file (`App_Data/`)   |
-| Hosting   | Kestrel (console or Windows Service) |
+| Layer     | Technology                              |
+|-----------|-----------------------------------------|
+| Framework | ASP.NET Core MVC (.NET 10)              |
+| Frontend  | Bootstrap, jQuery, vanilla JS           |
+| Storage   | Local SQL Lite database (`App_Data/`)   |
+| Hosting   | Kestrel (console or Windows Service)    |
 
 ## Getting Started
 
@@ -32,7 +32,7 @@ A lightweight Kanban board web application built with ASP.NET Core MVC and .NET 
 dotnet run
 ```
 
-The app starts at **http://localhost:5207** (development port).
+The app starts at **<http://localhost:5207**> (development port).
 
 ### Run in Production (Console)
 
@@ -40,7 +40,7 @@ The app starts at **http://localhost:5207** (development port).
 dotnet run --configuration Release
 ```
 
-Listens on **http://0.0.0.0:5100** (configured in `appsettings.json`).
+Listens on **<http://0.0.0.0:5100**> (configured in `appsettings.json`).
 
 ## Install as a Windows Service
 
@@ -56,7 +56,7 @@ The included PowerShell script handles publishing, installing, and managing the 
 .\install-service.ps1 -Action start
 ```
 
-The board is now available at **http://localhost:5100**.
+The board is now available at **<http://localhost:5100**.>
 
 ### All Commands
 
@@ -120,7 +120,7 @@ The board UI is backed by a JSON API:
 
 ## Project Structure
 
-```
+```text
 kanban.net/
 ├── Controllers/
 │   ├── CardsController.cs      # Cards REST API

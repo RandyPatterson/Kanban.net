@@ -1,0 +1,117 @@
+ol errors</h4>
+<p>Throw <a class="xref" href="../../api/ModelContextProtocol.McpProtocolException.html">McpProtocolException</a> to signal a protocol-level error (e.g., invalid parameters or unknown tool). These exceptions propagate as JSON-RPC error responses rather than tool error results:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Processes the input&quot;)]
+public static string Process(string input)
+{
+    if (string.IsNullOrEmpty(input))
+    {
+        // Propagates as a JSON-RPC error with code -32602 (InvalidParams)
+        // and message &quot;Missing required input&quot;
+        throw new McpProtocolException(&quot;Missing required input&quot;, McpErrorCode.InvalidParams);
+    }
+
+    return $&quot;Processed: {input}&quot;;
+}
+</code></pre>
+<h4 id="checking-for-errors-on-the-client">Checking for errors on the client</h4>
+<p>On the client side, inspect the <a class="xref" href="../../api/ModelContextProtocol.Protocol.CallToolResult.html#ModelContextProtocol_Protocol_CallToolResult_IsError">IsError</a> property after calling a tool:</p>
+<pre><code class="lang-csharp">CallToolResult result = await client.CallToolAsync(&quot;divide&quot;, new Dictionary&lt;string, object?&gt;
+{
+    [&quot;a&quot;] = 10,
+    [&quot;b&quot;] = 0
+});
+
+if (result.IsError is true)
+{
+    // Prints: &quot;Tool error: An error occurred invoking 'divide'.&quot;
+    Console.WriteLine($&quot;Tool error: {result.Content.OfType&lt;TextContentBlock&gt;().FirstOrDefault()?.Text}&quot;);
+}
+</code></pre>
+<h3 id="tool-list-change-notifications">Tool list change notifications</h3>
+<p>Servers can dynamically add, remove, or modify tools at runtime. When the tool list changes, the server notifies connected clients so they can refresh their tool list. These are unsolicited notifications, so they require <a class="xref" href="../stateless/stateless.html">stateful mode or stdio</a> — <a class="xref" href="../stateless/stateless.html#stateless-mode-recommended">stateless</a> servers cannot send unsolicited notifications.</p>
+<h4 id="sending-notifications-from-the-server">Sending notifications from the server</h4>
+<p>Inject <a class="xref" href="../../api/ModelContextProtocol.Server.McpServer.html">McpServer</a> and call the notification method after modifying the tool list:</p>
+<pre><code class="lang-csharp">// After adding or removing tools dynamically
+await server.SendNotificationAsync(
+    NotificationMethods.ToolListChangedNotification,
+    new ToolListChangedNotificationParams());
+</code></pre>
+<h4 id="handling-notifications-on-the-client">Handling notifications on the client</h4>
+<p>Register a notification handler on the client to respond to tool list changes:</p>
+<pre><code class="lang-csharp">mcpClient.RegisterNotificationHandler(
+    NotificationMethods.ToolListChangedNotification,
+    async (notification, cancellationToken) =&gt;
+    {
+        // Refresh the tool list
+        var updatedTools = await mcpClient.ListToolsAsync(cancellationToken: cancellationToken);
+        Console.WriteLine($&quot;Tool list updated. {updatedTools.Count} tools available.&quot;);
+    });
+</code></pre>
+<h3 id="json-schema-generation">JSON Schema generation</h3>
+<p>Tool parameters are described using <a href="https://json-schema.org/specification">JSON Schema 2020-12</a>. JSON schemas are automatically generated from .NET method signatures when the <code>[McpServerTool]</code> attribute is applied. Parameter types are mapped to JSON Schema types:</p>
+<table>
+<thead>
+<tr>
+<th>.NET Type</th>
+<th>JSON Schema Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>string</code></td>
+<td><code>string</code></td>
+</tr>
+<tr>
+<td><code>int</code>, <code>long</code></td>
+<td><code>integer</code></td>
+</tr>
+<tr>
+<td><code>float</code>, <code>double</code></td>
+<td><code>number</code></td>
+</tr>
+<tr>
+<td><code>bool</code></td>
+<td><code>boolean</code></td>
+</tr>
+<tr>
+<td>Complex types</td>
+<td><code>object</code> with <code>properties</code></td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>[Description]</code> attributes on parameters to populate the <code>description</code> field in the generated schema. This helps LLMs understand what each parameter expects.</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Searches for items&quot;)]
+public static string Search(
+    [Description(&quot;The search query string&quot;)] string query,
+    [Description(&quot;Maximum results to return (1-100)&quot;)] int maxResults = 10)
+{
+    // Schema will include descriptions and default value for maxResults
+}
+</code></pre>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/modelcontextprotocol/csharp-sdk/blob/v1.4.1/docs/concepts/tools/tools.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          <span>Made with <a href="https://dotnet.github.io/docfx">docfx</a></span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+

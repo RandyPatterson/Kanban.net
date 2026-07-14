@@ -1,0 +1,169 @@
+<article data-uid="tools">
+
+<h2 id="tools">Tools</h2>
+<p>MCP <a href="https://modelcontextprotocol.io/specification/2025-11-25/server/tools">tools</a> allow servers to expose callable functions to clients. Tools are the primary mechanism for LLMs to take action through MCP—they enable everything from querying databases to calling web APIs.</p>
+<p>This document covers tool content types, change notifications, and schema generation.</p>
+<h3 id="defining-tools-on-the-server">Defining tools on the server</h3>
+<p>Tools can be defined in several ways:</p>
+<ul>
+<li>Using the <a class="xref" href="../../api/ModelContextProtocol.Server.McpServerToolAttribute.html">McpServerToolAttribute</a> attribute on methods within a class marked with <a class="xref" href="../../api/ModelContextProtocol.Server.McpServerToolTypeAttribute.html">McpServerToolTypeAttribute</a></li>
+<li>Using <a class="xref" href="../../api/ModelContextProtocol.Server.McpServerTool.html#ModelContextProtocol_Server_McpServerTool_Create_">Create</a> factory methods from a delegate, <code>MethodInfo</code>, or <code>AIFunction</code></li>
+<li>Deriving from <a class="xref" href="../../api/ModelContextProtocol.Server.McpServerTool.html">McpServerTool</a> or <a class="xref" href="../../api/ModelContextProtocol.Server.DelegatingMcpServerTool.html">DelegatingMcpServerTool</a></li>
+<li>Implementing a custom <a class="xref" href="../../api/ModelContextProtocol.Server.McpRequestHandler-2.html">McpRequestHandler&lt;TParams, TResult&gt;</a> via <a class="xref" href="../../api/ModelContextProtocol.Server.McpServerHandlers.html">McpServerHandlers</a></li>
+<li>Implementing a low-level <a class="xref" href="../../api/ModelContextProtocol.Server.McpRequestFilter-2.html">McpRequestFilter&lt;TParams, TResult&gt;</a></li>
+</ul>
+<p>The attribute-based approach is the most common and is shown throughout this document. Parameters are automatically deserialized from JSON and documented using <code>[Description]</code> attributes. In addition to tool arguments, methods can accept special parameter types that are resolved automatically: <a class="xref" href="../../api/ModelContextProtocol.Server.McpServer.html">McpServer</a>, <code>IProgress&lt;ProgressNotificationValue&gt;</code>, <code>ClaimsPrincipal</code>, and any service registered through dependency injection.</p>
+<pre><code class="lang-csharp">[McpServerToolType]
+public class MyTools
+{
+    [McpServerTool, Description(&quot;Echoes the input message back&quot;)]
+    public static string Echo([Description(&quot;The message to echo&quot;)] string message)
+        =&gt; $&quot;Echo: {message}&quot;;
+}
+</code></pre>
+<p>Register the tool type when building the server:</p>
+<pre><code class="lang-csharp">builder.Services.AddMcpServer()
+    .WithHttpTransport(o =&gt; o.Stateless = true)
+    .WithTools&lt;MyTools&gt;();
+</code></pre>
+<h3 id="content-types">Content types</h3>
+<p>Tools can return various content types. The simplest is a <code>string</code>, which is automatically wrapped in a <a class="xref" href="../../api/ModelContextProtocol.Protocol.TextContentBlock.html">TextContentBlock</a>. For richer content, tools can return one or more <a class="xref" href="../../api/ModelContextProtocol.Protocol.ContentBlock.html">ContentBlock</a> instances. Tools can also return <code>DataContent</code> from Microsoft.Extensions.AI, which is automatically mapped to the appropriate MCP content block: image MIME types become <a class="xref" href="../../api/ModelContextProtocol.Protocol.ImageContentBlock.html">ImageContentBlock</a>, audio MIME types become <a class="xref" href="../../api/ModelContextProtocol.Protocol.AudioContentBlock.html">AudioContentBlock</a>, and all other MIME types become <a class="xref" href="../../api/ModelContextProtocol.Protocol.EmbeddedResourceBlock.html">EmbeddedResourceBlock</a> with binary resource contents.</p>
+<h4 id="text-content">Text content</h4>
+<p>Return a <code>string</code> or a <a class="xref" href="../../api/ModelContextProtocol.Protocol.TextContentBlock.html">TextContentBlock</a> directly:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns a greeting&quot;)]
+public static string Greet(string name) =&gt; $&quot;Hello, {name}!&quot;;
+</code></pre>
+<h4 id="image-content">Image content</h4>
+<p>Return an <a class="xref" href="../../api/ModelContextProtocol.Protocol.ImageContentBlock.html">ImageContentBlock</a> with base64-encoded image data and a MIME type.
+Use the <a class="xref" href="../../api/ModelContextProtocol.Protocol.ImageContentBlock.html#ModelContextProtocol_Protocol_ImageContentBlock_FromBytes_">FromBytes</a> factory method or construct the block directly:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns a generated image&quot;)]
+public static ImageContentBlock GenerateImage()
+{
+    byte[] pngBytes = CreateImage(); // your image generation logic
+    return ImageContentBlock.FromBytes(pngBytes, &quot;image/png&quot;);
+}
+</code></pre>
+<h4 id="audio-content">Audio content</h4>
+<p>Return an <a class="xref" href="../../api/ModelContextProtocol.Protocol.AudioContentBlock.html">AudioContentBlock</a> with base64-encoded audio data and a MIME type.
+The <a class="xref" href="../../api/ModelContextProtocol.Protocol.AudioContentBlock.html#ModelContextProtocol_Protocol_AudioContentBlock_FromBytes_">FromBytes</a> factory method encodes the raw bytes automatically:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns a synthesized audio clip&quot;)]
+public static AudioContentBlock Synthesize(string text)
+{
+    byte[] wavBytes = TextToSpeech(text); // your audio synthesis logic
+    return AudioContentBlock.FromBytes(wavBytes, &quot;audio/wav&quot;);
+}
+</code></pre>
+<p>Supported audio MIME types include <code>audio/wav</code>, <code>audio/mp3</code>, <code>audio/ogg</code>, and others depending on what the client can handle.</p>
+<h4 id="embedded-resources">Embedded resources</h4>
+<p>Return an <a class="xref" href="../../api/ModelContextProtocol.Protocol.EmbeddedResourceBlock.html">EmbeddedResourceBlock</a> to embed a resource directly in a tool result.
+The resource can contain either text or binary data through <a class="xref" href="../../api/ModelContextProtocol.Protocol.TextResourceContents.html">TextResourceContents</a> or <a class="xref" href="../../api/ModelContextProtocol.Protocol.BlobResourceContents.html">BlobResourceContents</a>:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns a document as an embedded resource&quot;)]
+public static EmbeddedResourceBlock GetDocument()
+{
+    return new EmbeddedResourceBlock
+    {
+        Resource = new TextResourceContents
+        {
+            Uri = &quot;docs://readme&quot;,
+            MimeType = &quot;text/plain&quot;,
+            Text = &quot;This is the document content.&quot;
+        }
+    };
+}
+</code></pre>
+<p>For binary resources, use <a class="xref" href="../../api/ModelContextProtocol.Protocol.BlobResourceContents.html">BlobResourceContents</a>:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns a binary resource&quot;)]
+public static EmbeddedResourceBlock GetBinaryData(string id)
+{
+    byte[] data = LoadData(id); // application logic to load data by ID
+    return new EmbeddedResourceBlock
+    {
+        Resource = BlobResourceContents.FromBytes(data, $&quot;data://items/{id}&quot;, &quot;application/octet-stream&quot;)
+    };
+}
+</code></pre>
+<h4 id="mixed-content">Mixed content</h4>
+<p>Tools can return multiple content blocks by returning <code>IEnumerable&lt;ContentBlock&gt;</code>:</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Returns text and an image&quot;)]
+public static IEnumerable&lt;ContentBlock&gt; DescribeImage()
+{
+    byte[] imageBytes = GetImage();
+    return
+    [
+        new TextContentBlock { Text = &quot;Here is the generated image:&quot; },
+        ImageContentBlock.FromBytes(imageBytes, &quot;image/png&quot;),
+        new TextContentBlock { Text = &quot;The image shows a landscape.&quot; }
+    ];
+}
+</code></pre>
+<h4 id="content-annotations">Content annotations</h4>
+<p>Any content block can include <a class="xref" href="../../api/ModelContextProtocol.Protocol.Annotations.html">Annotations</a> to provide hints about the intended audience and priority:</p>
+<pre><code class="lang-csharp">new TextContentBlock
+{
+    Text = &quot;Detailed debug information&quot;,
+    Annotations = new Annotations
+    {
+        Audience = [Role.Assistant], // Only for the LLM, not the user
+        Priority = 0.3f             // Low priority (0.0 to 1.0)
+    }
+}
+</code></pre>
+<h3 id="consuming-tools-on-the-client">Consuming tools on the client</h3>
+<p>Clients can discover and call tools using <a class="xref" href="../../api/ModelContextProtocol.Client.McpClient.html">McpClient</a>:</p>
+<pre><code class="lang-csharp">// List available tools
+IList&lt;McpClientTool&gt; tools = await client.ListToolsAsync();
+
+foreach (var tool in tools)
+{
+    Console.WriteLine($&quot;{tool.Name}: {tool.Description}&quot;);
+}
+
+// Call a tool by finding it in the list
+McpClientTool echoTool = tools.First(t =&gt; t.Name == &quot;echo&quot;);
+CallToolResult result = await echoTool.CallAsync(
+    new Dictionary&lt;string, object?&gt; { [&quot;message&quot;] = &quot;Hello!&quot; });
+
+// Process the result content blocks
+foreach (var content in result.Content)
+{
+    switch (content)
+    {
+        case TextContentBlock text:
+            Console.WriteLine(text.Text);
+            break;
+        case ImageContentBlock image:
+            File.WriteAllBytes(&quot;output.png&quot;, image.DecodedData.ToArray());
+            break;
+        case AudioContentBlock audio:
+            File.WriteAllBytes(&quot;output.wav&quot;, audio.DecodedData.ToArray());
+            break;
+        case EmbeddedResourceBlock resource:
+            if (resource.Resource is TextResourceContents textResource)
+                Console.WriteLine(textResource.Text);
+            break;
+    }
+}
+</code></pre>
+<h3 id="error-handling">Error handling</h3>
+<p>Tool errors in MCP are distinct from protocol errors. When a tool encounters an error during execution, the error is reported inside the <a class="xref" href="../../api/ModelContextProtocol.Protocol.CallToolResult.html">CallToolResult</a> with <a class="xref" href="../../api/ModelContextProtocol.Protocol.CallToolResult.html#ModelContextProtocol_Protocol_CallToolResult_IsError">IsError</a> set to <code>true</code>, rather than as a protocol-level exception. This allows the LLM to see the error and potentially recover.</p>
+<h4 id="automatic-exception-handling">Automatic exception handling</h4>
+<p>When a tool method throws an exception, the server catches it and returns a <code>CallToolResult</code> with <code>IsError = true</code>, with the following exceptions:</p>
+<ul>
+<li><a class="xref" href="../../api/ModelContextProtocol.McpProtocolException.html">McpProtocolException</a> is re-thrown as a JSON-RPC error response (not a tool error result).</li>
+<li><code>OperationCanceledException</code> is re-thrown when the cancellation token was triggered.</li>
+</ul>
+<p>For all other exceptions, the error is returned as a tool result. If the exception derives from <a class="xref" href="../../api/ModelContextProtocol.McpException.html">McpException</a> (excluding <code>McpProtocolException</code>, which is re-thrown above), its message is included in the error text; otherwise, a generic message is returned to avoid leaking internal details.</p>
+<pre><code class="lang-csharp">[McpServerTool, Description(&quot;Divides two numbers&quot;)]
+public static double Divide(double a, double b)
+{
+    if (b == 0)
+    {
+        // ArgumentException is not an McpException, so the client receives a generic message:
+        // &quot;An error occurred invoking 'divide'.&quot;
+        throw new ArgumentException(&quot;Cannot divide by zero&quot;);
+    }
+
+    return a / b;
+}
+</code></pre>
+<h4 id="protocol-errors">Protoc

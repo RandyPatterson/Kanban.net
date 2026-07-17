@@ -123,8 +123,11 @@ function renderBoard() {
             const colEl = document.createElement('div');
             colEl.className = 'kanban-column';
             colEl.dataset.column = col.id;
+            const collapsed = isColumnCollapsed(col.id);
+            if (collapsed) colEl.classList.add('collapsed');
             colEl.innerHTML = `
                 <div class="column-header">
+                    <button class="btn-collapse-column" title="Collapse/expand column" aria-expanded="${!collapsed}">${collapsed ? '\u25B6' : '\u25BC'}</button>
                     <span class="column-title">${escapeHtml(col.title)}</span>
                     <span class="card-count" id="count-${col.id}">0</span>
                     <button class="btn-add-card" title="Add card">+</button>
@@ -132,9 +135,50 @@ function renderBoard() {
                 <div class="card-list" id="list-${col.id}"></div>
             `;
             colEl.querySelector('.btn-add-card').addEventListener('click', () => openCardModal(col.id));
+            colEl.querySelector('.btn-collapse-column').addEventListener('click', () => toggleColumnCollapse(col.id));
             board.appendChild(colEl);
         });
     setupDragAndDrop();
+}
+
+// ── Column collapse/expand ──
+function collapsedStorageKey() {
+    return `collapsedColumns:${currentProjectId || 'default'}`;
+}
+
+function getCollapsedColumns() {
+    try {
+        const raw = localStorage.getItem(collapsedStorageKey());
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function isColumnCollapsed(columnId) {
+    return getCollapsedColumns().includes(columnId);
+}
+
+function setColumnCollapsed(columnId, collapsed) {
+    const set = new Set(getCollapsedColumns());
+    if (collapsed) {
+        set.add(columnId);
+    } else {
+        set.delete(columnId);
+    }
+    localStorage.setItem(collapsedStorageKey(), JSON.stringify([...set]));
+}
+
+function toggleColumnCollapse(columnId) {
+    const colEl = document.querySelector(`.kanban-column[data-column="${columnId}"]`);
+    if (!colEl) return;
+    const collapsed = colEl.classList.toggle('collapsed');
+    setColumnCollapsed(columnId, collapsed);
+    const btn = colEl.querySelector('.btn-collapse-column');
+    if (btn) {
+        btn.textContent = collapsed ? '\u25B6' : '\u25BC';
+        btn.setAttribute('aria-expanded', String(!collapsed));
+    }
 }
 
 // ── Rendering ──

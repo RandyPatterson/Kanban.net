@@ -37,7 +37,7 @@ public class CardsController : ControllerBase
 			cards = cards.Where(c => c.LabelIds.Contains(labelId));
 		}
 
-		return Ok(cards.OrderBy(c => c.Position).ToList());
+		return Ok(cards.ToList());
 	}
 
     [HttpPost]

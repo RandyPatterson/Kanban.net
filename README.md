@@ -7,6 +7,8 @@ A lightweight Kanban board web application built with ASP.NET Core MVC and .NET 
 - **Kanban board** with drag-and-drop card management
 - **Multi-project boards** — create, rename and switch between multiple boards
 - **Columns** — create, rename, reorder and delete columns per board (seeded with To Do / In Progress / Done)
+- **Collapsible columns** — collapse/expand individual columns to focus the board; state is remembered per project
+- **Per-column sorting** — sort each column independently by position, title, priority or label via a dropdown in the column header (hidden while the column is collapsed); choice is remembered per project
 - **Labels** — create, edit, color-code and assign labels to cards
 - **Priorities** — create, edit, color-code and assign priority levels to cards
 - **Search & filter** — find cards by title/description or filter by label

@@ -175,6 +175,26 @@ body {
     color: var(--text-primary);
 }
 
+.column-sort {
+    margin-left: auto;
+    background: rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.1);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    border-radius: 4px;
+    padding: 2px 4px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.column-sort:hover {
+    color: var(--text-primary);
+}
+
+.column-sort + .btn-add-card {
+    margin-left: 4px;
+}
+
 /* Collapse/expand toggle */
 .btn-collapse-column {
     background: none;
@@ -205,6 +225,7 @@ body {
 
 .kanban-column.collapsed .card-list,
 .kanban-column.collapsed .card-count,
+.kanban-column.collapsed .column-sort,
 .kanban-column.collapsed .btn-add-card {
     display: none;
 }

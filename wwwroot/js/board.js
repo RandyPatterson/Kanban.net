@@ -125,17 +125,27 @@ function renderBoard() {
             colEl.dataset.column = col.id;
             const collapsed = isColumnCollapsed(col.id);
             if (collapsed) colEl.classList.add('collapsed');
+            const currentSort = getColumnSort(col.id);
+            const sortOption = (value, text) =>
+                `<option value="${value}"${currentSort === value ? ' selected' : ''}>${text}</option>`;
             colEl.innerHTML = `
                 <div class="column-header">
                     <button class="btn-collapse-column" title="Collapse/expand column" aria-expanded="${!collapsed}">${collapsed ? '\u25B6' : '\u25BC'}</button>
                     <span class="column-title">${escapeHtml(col.title)}</span>
                     <span class="card-count" id="count-${col.id}">0</span>
+                    <select class="column-sort" title="Sort cards">
+                        ${sortOption('position', 'Position')}
+                        ${sortOption('title', 'Title')}
+                        ${sortOption('priority', 'Priority')}
+                        ${sortOption('label', 'Label')}
+                    </select>
                     <button class="btn-add-card" title="Add card">+</button>
                 </div>
                 <div class="card-list" id="list-${col.id}"></div>
             `;
             colEl.querySelector('.btn-add-card').addEventListener('click', () => openCardModal(col.id));
             colEl.querySelector('.btn-collapse-column').addEventListener('click', () => toggleColumnCollapse(col.id));
+            colEl.querySelector('.column-sort').addEventListener('change', (e) => onColumnSortChange(col.id, e.target.value));
             board.appendChild(colEl);
         });
     setupDragAndDrop();
@@ -181,6 +191,35 @@ function toggleColumnCollapse(columnId) {
     }
 }
 
+// ── Per-column sorting ──
+function columnSortStorageKey() {
+    return `columnSort:${currentProjectId || 'default'}`;
+}
+
+function getColumnSortMap() {
+    try {
+        const raw = localStorage.getItem(columnSortStorageKey());
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+}
+
+function getColumnSort(columnId) {
+    return getColumnSortMap()[columnId] || 'position';
+}
+
+function setColumnSort(columnId, sort) {
+    const map = getColumnSortMap();
+    map[columnId] = sort;
+    localStorage.setItem(columnSortStorageKey(), JSON.stringify(map));
+}
+
+function onColumnSortChange(columnId, sort) {
+    setColumnSort(columnId, sort);
+    renderCards();
+}
+
 // ── Rendering ──
 function renderCards() {
     const columns = allColumns.map(c => c.id);
@@ -195,11 +234,32 @@ function renderCards() {
             const idx = allPriorities.findIndex(p => p.id === id);
             return idx === -1 ? -1 : idx;
         };
+        const labelSortKey = (card) => {
+            if (!card.labelIds || card.labelIds.length === 0) return '';
+            const names = card.labelIds
+                .map(lid => allLabels.find(l => l.id === lid))
+                .filter(Boolean)
+                .map(l => l.name.toLowerCase())
+                .sort();
+            return names.length ? names[0] : '';
+        };
+        const sortMode = getColumnSort(col);
         const cards = allCards
             .filter(c => c.column === col)
             .sort((a, b) => {
-                const diff = priorityOrdinal(b.priorityId) - priorityOrdinal(a.priorityId);
-                return diff !== 0 ? diff : a.position - b.position;
+                switch (sortMode) {
+                    case 'title':
+                        return a.title.localeCompare(b.title) || a.position - b.position;
+                    case 'priority': {
+                        const diff = priorityOrdinal(b.priorityId) - priorityOrdinal(a.priorityId);
+                        return diff !== 0 ? diff : a.position - b.position;
+                    }
+                    case 'label':
+                        return labelSortKey(a).localeCompare(labelSortKey(b)) || a.position - b.position;
+                    case 'position':
+                    default:
+                        return a.position - b.position;
+                }
             });
 
         list.innerHTML = '';

@@ -2,19 +2,30 @@
 
 <div class="kanban-app">
     <!-- Toolbar -->
-    <div class="kanban-toolbar">
-        <h1>📋 Kanban Board</h1>
-        <div class="toolbar-controls">
-            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search cards..." />
-            <select id="labelFilter" class="form-select form-select-sm">
+    <header class="kanban-toolbar">
+        <div class="toolbar-brand">
+            <h1>📋 Kanban Board</h1>
+        </div>
+        <div class="toolbar-controls" role="search">
+            <div class="search-field">
+                <span class="search-icon" aria-hidden="true">🔍</span>
+                <label for="searchInput" class="sr-only">Search cards</label>
+                <input type="search" id="searchInput" class="form-control form-control-sm" placeholder="Search cards..." aria-label="Search cards" />
+            </div>
+            <label for="labelFilter" class="sr-only">Filter by label</label>
+            <select id="labelFilter" class="form-select form-select-sm" aria-label="Filter by label">
                 <option value="">All Labels</option>
             </select>
+            <button type="button" id="themeToggle" class="btn-theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <span class="icon-moon" aria-hidden="true">🌙</span>
+                <span class="icon-sun" aria-hidden="true">☀️</span>
+            </button>
         </div>
-    </div>
-    <div class="toolbar-manage">
+    </header>
+    <nav class="toolbar-manage" aria-label="Board management">
         <div class="project-selector">
             <label for="projectSelect" class="project-selector-label">Project</label>
-            <select id="projectSelect" class="form-select form-select-sm" onchange="onProjectChange(this.value)"></select>
+            <select id="projectSelect" class="form-select form-select-sm" onchange="onProjectChange(this.value)" aria-label="Select project"></select>
         </div>
         <div class="manage-buttons">
             <button class="btn btn-sm btn-outline-secondary" onclick="openProjectManager()">📁 Projects</button>
@@ -22,14 +33,17 @@
             <button class="btn btn-sm btn-outline-secondary" onclick="openPriorityManager()">⚑ Priorities</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="openColumnManager()">🗂️ Columns</button>
         </div>
-    </div>
+    </nav>
 
     <!-- Board -->
-    <div class="kanban-board" id="kanbanBoard"></div>
+    <main class="kanban-board" id="kanbanBoard" aria-label="Kanban board" aria-busy="false"></main>
 </div>
 
+<!-- Toast notifications -->
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
 <!-- Card Modal -->
-<div class="modal fade" id="cardModal" tabindex="-1">
+<div class="modal fade" id="cardModal" tabindex="-1" aria-labelledby="cardModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -68,11 +82,11 @@
 </div>
 
 <!-- Label Manager Modal -->
-<div class="modal fade" id="labelModal" tabindex="-1">
+<div class="modal fade" id="labelModal" tabindex="-1" aria-labelledby="labelModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Manage Labels</h5>
+                <h5 class="modal-title" id="labelModalTitle">Manage Labels</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -89,11 +103,11 @@
     </div>
 </div>
 
-<!-- Column Manager Modal --><div class="modal fade" id="columnModal" tabindex="-1">
+<div class="modal fade" id="columnModal" tabindex="-1" aria-labelledby="columnModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Manage Columns</h5>
+                <h5 class="modal-title" id="columnModalTitle">Manage Columns</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -111,11 +125,11 @@
 </div>
 
 <!-- Priority Manager Modal -->
-<div class="modal fade" id="priorityModal" tabindex="-1">
+<div class="modal fade" id="priorityModal" tabindex="-1" aria-labelledby="priorityModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Manage Priorities</h5>
+                <h5 class="modal-title" id="priorityModalTitle">Manage Priorities</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -133,11 +147,11 @@
 </div>
 
 <!-- Project Manager Modal -->
-<div class="modal fade" id="projectModal" tabindex="-1">
+<div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Manage Projects</h5>
+                <h5 class="modal-title" id="projectModalTitle">Manage Projects</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -155,11 +169,11 @@
 </div>
 
 <!-- Delete Project Warning Modal -->
-<div class="modal fade" id="projectDeleteModal" tabindex="-1">
+<div class="modal fade" id="projectDeleteModal" tabindex="-1" aria-labelledby="projectDeleteModalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title text-danger">⚠️ Delete Project</h5>
+                <h5 class="modal-title text-danger" id="projectDeleteModalTitle">⚠️ Delete Project</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

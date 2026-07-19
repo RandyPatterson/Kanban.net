@@ -32,13 +32,62 @@ window.fetch = function (input, init) {
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadProjects();
-    await loadColumns();
-    await loadLabels();
-    await loadPriorities();
-    await loadCards();
-    setupSearch();
+    showBoardLoading();
+    try {
+        await loadProjects();
+        await loadColumns();
+        await loadLabels();
+        await loadPriorities();
+        await loadCards();
+        setupSearch();
+    } catch (err) {
+        console.error('Failed to load board data:', err);
+        showBoardError();
+    }
 });
+
+// ── Board loading / error states ──
+function showBoardLoading() {
+    const board = document.getElementById('kanbanBoard');
+    if (!board) return;
+    board.setAttribute('aria-busy', 'true');
+    const col = () => `
+        <div class="skeleton-column" aria-hidden="true">
+            <div class="skeleton-line" style="width:60%"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card" style="height:50px"></div>
+        </div>`;
+    board.innerHTML = `<div class="skeleton-board">${col()}${col()}${col()}</div>`;
+}
+
+function showBoardError() {
+    const board = document.getElementById('kanbanBoard');
+    if (!board) return;
+    board.setAttribute('aria-busy', 'false');
+    board.innerHTML = `
+        <div class="board-state board-error" role="alert">
+            <div class="board-state-inner">
+                <span class="state-icon" aria-hidden="true">\u26D4</span>
+                <h2>Couldn't load the board</h2>
+                <p>Something went wrong while loading your data. Check your connection and try again.</p>
+                <button type="button" class="btn btn-primary btn-sm" onclick="retryLoad()">Retry</button>
+            </div>
+        </div>`;
+}
+
+async function retryLoad() {
+    showBoardLoading();
+    try {
+        await loadColumns();
+        await loadLabels();
+        await loadPriorities();
+        await loadCards();
+    } catch (err) {
+        console.error('Retry failed:', err);
+        showBoardError();
+    }
+}
 
 // ── Data Loading ──
 async function loadCards() {
@@ -116,6 +165,21 @@ function renderBoard() {
         return;
     }
     board.innerHTML = '';
+    board.setAttribute('aria-busy', 'false');
+
+    if (!allColumns || allColumns.length === 0) {
+        board.innerHTML = `
+            <div class="board-state" role="status">
+                <div class="board-state-inner">
+                    <span class="state-icon" aria-hidden="true">\uD83D\uDDC2\uFE0F</span>
+                    <h2>No columns yet</h2>
+                    <p>Add your first column to start organizing cards on this board.</p>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="openColumnManager()">Add column</button>
+                </div>
+            </div>`;
+        return;
+    }
+
     allColumns
         .slice()
         .sort((a, b) => a.position - b.position)
@@ -128,18 +192,19 @@ function renderBoard() {
             const currentSort = getColumnSort(col.id);
             const sortOption = (value, text) =>
                 `<option value="${value}"${currentSort === value ? ' selected' : ''}>${text}</option>`;
+            const safeTitle = escapeHtml(col.title);
             colEl.innerHTML = `
                 <div class="column-header">
-                    <button class="btn-collapse-column" title="Collapse/expand column" aria-expanded="${!collapsed}">${collapsed ? '\u25B6' : '\u25BC'}</button>
-                    <span class="column-title">${escapeHtml(col.title)}</span>
-                    <span class="card-count" id="count-${col.id}">0</span>
-                    <select class="column-sort" title="Sort cards">
+                    <button class="btn-collapse-column" title="Collapse/expand column" aria-label="Collapse or expand ${safeTitle} column" aria-expanded="${!collapsed}">${collapsed ? '\u25B6' : '\u25BC'}</button>
+                    <span class="column-title">${safeTitle}</span>
+                    <span class="card-count" id="count-${col.id}" aria-label="Card count">0</span>
+                    <select class="column-sort" title="Sort cards" aria-label="Sort cards in ${safeTitle}">
                         ${sortOption('position', 'Position')}
                         ${sortOption('title', 'Title')}
                         ${sortOption('priority', 'Priority')}
                         ${sortOption('label', 'Label')}
                     </select>
-                    <button class="btn-add-card" title="Add card">+</button>
+                    <button class="btn-add-card" title="Add card" aria-label="Add card to ${safeTitle}">+</button>
                 </div>
                 <div class="card-list" id="list-${col.id}"></div>
             `;
@@ -278,12 +343,16 @@ function renderCards() {
             el.className = `kanban-card${visible ? '' : ' hidden'}`;
             el.draggable = true;
             el.dataset.id = card.id;
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', `Card: ${card.title}. Press Enter to edit.`);
 
             const priority = card.priorityId ? allPriorities.find(p => p.id === card.priorityId) : null;
-            const cardColor = priority ? priority.color : '#0079bf';
-            const c1 = hexToRgba(cardColor, 0.1);
-            const c2 = hexToRgba(cardColor, 0.3);
-            el.style.background = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+            // Clean flat SaaS: white surface with a colored left accent indicating priority.
+            el.style.background = 'var(--bg-surface)';
+            if (priority) {
+                el.style.borderLeft = `3px solid ${priority.color}`;
+            }
 
             const labelsHtml = card.labelIds
                 .map(lid => {
@@ -302,17 +371,33 @@ function renderCards() {
                     ${renderPriorityChip(card.priorityId)}
                 </div>
                 <div class="card-actions">
-                    <button onclick="editCard('${card.id}')" title="Edit">✏️ Edit</button>
-                    <button onclick="deleteCardDirect('${card.id}')" title="Delete">🗑️</button>
+                    <button onclick="editCard('${card.id}')" title="Edit" aria-label="Edit card ${escapeHtml(card.title)}">✏️ Edit</button>
+                    <button onclick="deleteCardDirect('${card.id}')" title="Delete" aria-label="Delete card ${escapeHtml(card.title)}">🗑️</button>
                 </div>
             `;
 
             // Drag events on card
             el.addEventListener('dragstart', handleDragStart);
             el.addEventListener('dragend', handleDragEnd);
+            // Keyboard: open the card for editing on Enter/Space (ignore action buttons)
+            el.addEventListener('keydown', (e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && e.target === el) {
+                    e.preventDefault();
+                    editCard(card.id);
+                }
+            });
 
             list.appendChild(el);
         });
+
+        if (visibleCount === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'column-empty';
+            empty.innerHTML = `
+                <span class="empty-icon" aria-hidden="true">🗒️</span>
+                <span>${searchTerm || labelFilter ? 'No matching cards' : 'No cards yet'}</span>`;
+            list.appendChild(empty);
+        }
 
         const countEl = document.getElementById(`count-${col}`);
         if (countEl) countEl.textContent = visibleCount;
@@ -394,7 +479,7 @@ function renderCardLabelCheckboxes(selectedIds) {
 async function saveCard() {
     const id = document.getElementById('cardId').value;
     const title = document.getElementById('cardTitle').value.trim();
-    if (!title) { alert('Title is required'); return; }
+    if (!title) { showToast('Title is required', 'warning'); return; }
 
     const labelIds = Array.from(document.querySelectorAll('#cardLabels input:checked'))
         .map(cb => cb.value);
@@ -425,6 +510,7 @@ async function saveCard() {
 
     bootstrap.Modal.getInstance(document.getElementById('cardModal')).hide();
     await loadCards();
+    showToast(id ? 'Card updated' : 'Card created', 'success');
 }
 
 async function deleteCard() {
@@ -433,12 +519,14 @@ async function deleteCard() {
     await fetch(`${API.cards}/${id}`, { method: 'DELETE' });
     bootstrap.Modal.getInstance(document.getElementById('cardModal')).hide();
     await loadCards();
+    showToast('Card deleted', 'success');
 }
 
 async function deleteCardDirect(id) {
     if (!confirm('Delete this card?')) return;
     await fetch(`${API.cards}/${id}`, { method: 'DELETE' });
     await loadCards();
+    showToast('Card deleted', 'success');
 }
 
 // ── Drag & Drop ──
@@ -581,7 +669,7 @@ function renderLabelList() {
 async function createLabel() {
     const name = document.getElementById('newLabelName').value.trim();
     const color = document.getElementById('newLabelColor').value;
-    if (!name) { alert('Label name is required'); return; }
+    if (!name) { showToast('Label name is required', 'warning'); return; }
 
     await fetch(API.labels, {
         method: 'POST',
@@ -592,13 +680,14 @@ async function createLabel() {
     document.getElementById('newLabelName').value = '';
     await loadLabels();
     renderLabelList();
+    showToast('Label created', 'success');
 }
 
 async function updateLabel(id) {
     const item = document.querySelector(`.label-item[data-id="${id}"]`);
     const name = item.querySelector('[data-field="name"]').value.trim();
     const color = item.querySelector('[data-field="color"]').value;
-    if (!name) { alert('Label name is required'); return; }
+    if (!name) { showToast('Label name is required', 'warning'); return; }
 
     await fetch(`${API.labels}/${id}`, {
         method: 'PUT',
@@ -609,6 +698,7 @@ async function updateLabel(id) {
     await loadLabels();
     renderLabelList();
     renderCards();
+    showToast('Label updated', 'success');
 }
 
 async function deleteLabel(id) {
@@ -617,6 +707,7 @@ async function deleteLabel(id) {
     await loadLabels();
     renderLabelList();
     await loadCards();
+    showToast('Label deleted', 'success');
 }
 
 // ── Priority Management ──
@@ -665,7 +756,7 @@ function renderPriorityList() {
 async function createPriority() {
     const name = document.getElementById('newPriorityName').value.trim();
     const color = document.getElementById('newPriorityColor').value;
-    if (!name) { alert('Priority name is required'); return; }
+    if (!name) { showToast('Priority name is required', 'warning'); return; }
 
     await fetch(API.priorities, {
         method: 'POST',
@@ -676,13 +767,14 @@ async function createPriority() {
     document.getElementById('newPriorityName').value = '';
     await loadPriorities();
     renderPriorityList();
+    showToast('Priority created', 'success');
 }
 
 async function updatePriority(id) {
     const item = document.querySelector(`#priorityList .label-item[data-id="${id}"]`);
     const name = item.querySelector('[data-field="name"]').value.trim();
     const color = item.querySelector('[data-field="color"]').value;
-    if (!name) { alert('Priority name is required'); return; }
+    if (!name) { showToast('Priority name is required', 'warning'); return; }
 
     await fetch(`${API.priorities}/${id}`, {
         method: 'PUT',
@@ -693,6 +785,7 @@ async function updatePriority(id) {
     await loadPriorities();
     renderPriorityList();
     renderCards();
+    showToast('Priority updated', 'success');
 }
 
 async function deletePriority(id) {
@@ -701,6 +794,7 @@ async function deletePriority(id) {
     await loadPriorities();
     renderPriorityList();
     await loadCards();
+    showToast('Priority deleted', 'success');
 }
 
 // ── Column Management ──
@@ -769,32 +863,34 @@ async function handleColumnDragEnd() {
 async function createColumn() {
     const titleEl = document.getElementById('newColumnTitle');
     const title = titleEl.value.trim();
-    if (!title) { alert('Column title is required'); return; }
+    if (!title) { showToast('Column title is required', 'warning'); return; }
     const res = await fetch(API.columns, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title })
     });
-    if (!res.ok) { alert('Failed to create column'); return; }
+    if (!res.ok) { showToast('Failed to create column', 'error'); return; }
     titleEl.value = '';
     await loadColumns();
     renderColumnList();
     await loadCards();
+    showToast('Column created', 'success');
 }
 
 async function updateColumn(id) {
     const item = document.querySelector(`.column-item[data-id="${id}"]`);
     const title = item.querySelector('[data-field="title"]').value.trim();
-    if (!title) { alert('Column title is required'); return; }
+    if (!title) { showToast('Column title is required', 'warning'); return; }
     const res = await fetch(`${API.columns}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title })
     });
-    if (!res.ok) { alert('Failed to update column'); return; }
+    if (!res.ok) { showToast('Failed to update column', 'error'); return; }
     await loadColumns();
     renderColumnList();
     await loadCards();
+    showToast('Column updated', 'success');
 }
 
 async function deleteColumn(id) {
@@ -806,10 +902,11 @@ async function deleteColumn(id) {
         if (!confirm(`This column has ${n} card(s). Delete the column AND its cards?`)) return;
         res = await fetch(`${API.columns}/${id}?force=true`, { method: 'DELETE' });
     }
-    if (!res.ok && res.status !== 204) { alert('Failed to delete column'); return; }
+    if (!res.ok && res.status !== 204) { showToast('Failed to delete column', 'error'); return; }
     await loadColumns();
     renderColumnList();
     await loadCards();
+    showToast('Column deleted', 'success');
 }
 
 // ── Project Management ──
@@ -839,19 +936,20 @@ function renderProjectList() {
 async function createProject() {
     const input = document.getElementById('newProjectName');
     const name = input.value.trim();
-    if (!name) { alert('Project name is required'); return; }
+    if (!name) { showToast('Project name is required', 'warning'); return; }
 
     const res = await fetch(API.projects, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
     });
-    if (!res.ok) { alert('Failed to create project'); return; }
+    if (!res.ok) { showToast('Failed to create project', 'error'); return; }
 
     const created = await res.json();
     input.value = '';
     await loadProjects();
     renderProjectList();
+    showToast('Project created', 'success');
 
     // Switch to the newly created project.
     if (created && created.id) {
@@ -865,22 +963,23 @@ async function createProject() {
 async function updateProject(id) {
     const item = document.querySelector(`#projectList .label-item[data-id="${id}"]`);
     const name = item.querySelector('[data-field="name"]').value.trim();
-    if (!name) { alert('Project name is required'); return; }
+    if (!name) { showToast('Project name is required', 'warning'); return; }
 
     const res = await fetch(`${API.projects}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
     });
-    if (!res.ok) { alert('Failed to update project'); return; }
+    if (!res.ok) { showToast('Failed to update project', 'error'); return; }
 
     await loadProjects();
     renderProjectList();
+    showToast('Project updated', 'success');
 }
 
 function deleteProject(id) {
     if (allProjects.length <= 1) {
-        alert('You cannot delete the last remaining project.');
+        showToast('You cannot delete the last remaining project.', 'warning');
         return;
     }
     const project = allProjects.find(p => p.id === id);
@@ -896,7 +995,7 @@ async function confirmDeleteProject() {
     const res = await fetch(`${API.projects}/${id}`, { method: 'DELETE' });
     if (!res.ok && res.status !== 204) {
         const body = await res.json().catch(() => ({}));
-        alert(body.error || 'Failed to delete project');
+        showToast(body.error || 'Failed to delete project', 'error');
         return;
     }
 
@@ -914,6 +1013,7 @@ async function confirmDeleteProject() {
     }
     await reloadCurrentProject();
     renderProjectList();
+    showToast('Project deleted', 'success');
 }
 
 // ── Util ──
@@ -939,4 +1039,53 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ── Theme (dark mode) ──
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    try { localStorage.setItem('theme', theme); } catch { /* ignore */ }
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        const isDark = theme === 'dark';
+        toggle.setAttribute('aria-pressed', String(isDark));
+        toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+        toggle.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// Sync the toggle's accessible state with the theme applied before paint.
+document.addEventListener('DOMContentLoaded', () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    applyTheme(current);
+});
+
+// ── Toast notifications ──
+function showToast(message, type = 'info', duration = 3200) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const icons = { success: '\u2705', error: '\u26D4', warning: '\u26A0\uFE0F', info: '\u2139\uFE0F' };
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.innerHTML = `
+        <span class="toast-icon" aria-hidden="true">${icons[type] || icons.info}</span>
+        <span class="toast-message">${escapeHtml(message)}</span>`;
+    container.appendChild(toast);
+
+    // Force reflow so the transition runs, then reveal.
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    const remove = () => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 200);
+    };
+    setTimeout(remove, duration);
 }

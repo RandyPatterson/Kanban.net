@@ -56,10 +56,10 @@
 	--space-6: 24px;
 	--space-8: 32px;
 
-	/* Radius */
+	/* Radius (crisp, flat SaaS) */
 	--radius-sm: 6px;
-	--radius-md: 10px;
-	--radius-lg: 16px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
 	--radius-pill: 999px;
 
 	/* Typography */
@@ -79,11 +79,11 @@
 	/* Focus ring */
 	--focus-ring: 0 0 0 3px rgba(29, 120, 196, 0.45);
 
-	/* ── Semantic tokens (LIGHT) ── */
-	--bg-app: var(--gray-100);
+	/* ── Semantic tokens (LIGHT) — Clean Flat SaaS ── */
+	--bg-app: #f4f5f7;
 	--bg-surface: #ffffff;
-	--bg-surface-2: var(--gray-50);
-	--bg-column: #eceef2;
+	--bg-surface-2: #fafbfc;
+	--bg-column: #f1f2f4;
 	--bg-elevated: #ffffff;
 	--bg-inset: rgba(0, 0, 0, 0.04);
 	--bg-inset-hover: rgba(0, 0, 0, 0.08);
@@ -96,12 +96,13 @@
 	--text-muted: var(--gray-500);
 	--text-on-brand: #ffffff;
 
-	--border-color: var(--gray-200);
-	--border-strong: var(--gray-300);
+	--border-color: #e4e6ea;
+	--border-strong: #d3d6dc;
 
-	--shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
-	--shadow-md: 0 4px 8px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.06);
-	--shadow-lg: 0 12px 24px rgba(16, 24, 40, 0.12), 0 4px 8px rgba(16, 24, 40, 0.08);
+	/* Flat, tight shadows */
+	--shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 1px rgba(16, 24, 40, 0.04);
+	--shadow-md: 0 2px 4px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
+	--shadow-lg: 0 8px 16px rgba(16, 24, 40, 0.12), 0 2px 4px rgba(16, 24, 40, 0.06);
 
 	--tape-bg: rgba(216, 210, 170, 0.55);
 	--fold-bg: rgba(0, 0, 0, 0.08);
@@ -110,15 +111,15 @@
 }
 
 [data-theme="dark"] {
-	--bg-app: #12151b;
-	--bg-surface: #1a1f27;
-	--bg-surface-2: #202631;
-	--bg-column: #1e232c;
-	--bg-elevated: #232a35;
+	--bg-app: #16191f;
+	--bg-surface: #1e222b;
+	--bg-surface-2: #232833;
+	--bg-column: #191d24;
+	--bg-elevated: #232833;
 	--bg-inset: rgba(255, 255, 255, 0.06);
 	--bg-inset-hover: rgba(255, 255, 255, 0.12);
 
-	--appbar-bg: #171b22;
+	--appbar-bg: #1a1e25;
 	--appbar-border: #2a313d;
 
 	--text-primary: #eef1f5;
@@ -129,9 +130,9 @@
 	--border-color: #2a313d;
 	--border-strong: #3a4351;
 
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-	--shadow-md: 0 4px 10px rgba(0, 0, 0, 0.45);
-	--shadow-lg: 0 14px 30px rgba(0, 0, 0, 0.55);
+	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+	--shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4);
+	--shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.5);
 
 	--tape-bg: rgba(120, 116, 88, 0.5);
 	--fold-bg: rgba(255, 255, 255, 0.12);
@@ -470,63 +471,30 @@ body {
 /* ── 6. Cards (refined post-it style) ─────────────────────────────────── */
 .kanban-card {
 	border-radius: var(--radius-sm);
-	padding: var(--space-4) var(--space-4) var(--space-3);
+	padding: var(--space-3) var(--space-4);
 	box-shadow: var(--shadow-sm);
 	cursor: grab;
-	transition: transform var(--transition), box-shadow var(--transition);
+	transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
 	border: 1px solid var(--border-color);
 	position: relative;
-	/* Refined: legible system font for body copy; a hint of handwriting only on titles */
 	font-family: var(--font-sans);
-	min-height: 60px;
-	transform: rotate(-0.4deg);
+	min-height: 52px;
 	flex-shrink: 0;
 	overflow: hidden;
 }
 
-/* Subtle folded corner */
-.kanban-card::before {
-	content: '';
-	position: absolute;
-	top: 0;
-	right: 0;
-	width: 16px;
-	height: 16px;
-	background: linear-gradient(225deg, var(--fold-bg) 50%, transparent 50%);
-	border-radius: 0 var(--radius-sm) 0 0;
-	pointer-events: none;
-}
-
-/* Subtle tape strip */
-.kanban-card::after {
-	content: '';
-	position: absolute;
-	top: -5px;
-	left: 50%;
-	transform: translateX(-50%);
-	width: 44px;
-	height: 11px;
-	background: var(--tape-bg);
-	border-radius: 1px;
-	opacity: 0.7;
-	pointer-events: none;
-}
-
-/* Gentle, subtle per-column rotation variety */
-.kanban-column .kanban-card:nth-child(even) { transform: rotate(0.5deg); }
-.kanban-column .kanban-card:nth-child(odd)  { transform: rotate(-0.5deg); }
-
 .kanban-card:hover {
-	box-shadow: var(--shadow-lg);
-	transform: rotate(0deg) translateY(-2px);
+	box-shadow: var(--shadow-md);
+	border-color: var(--border-strong);
+	transform: translateY(-1px);
 	z-index: 2;
 }
 
 .kanban-card:active { cursor: grabbing; }
 
 .kanban-card.dragging {
-	opacity: 0.65;
-	transform: rotate(2deg) scale(1.03);
+	opacity: 0.6;
+	transform: rotate(1.5deg);
 	box-shadow: var(--shadow-lg);
 }
 
@@ -540,13 +508,14 @@ body {
 }
 
 .card-title {
-	font-family: var(--font-hand);
-	font-size: 1rem;
+	font-family: var(--font-sans);
+	font-size: var(--text-base);
 	font-weight: 600;
-	line-height: 1.35;
+	line-height: 1.4;
 	margin-bottom: var(--space-1);
 	word-break: break-word;
 	color: var(--text-primary);
+	letter-spacing: -0.005em;
 }
 
 .card-description {

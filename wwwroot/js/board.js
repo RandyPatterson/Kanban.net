@@ -348,10 +348,11 @@ function renderCards() {
             el.setAttribute('aria-label', `Card: ${card.title}. Press Enter to edit.`);
 
             const priority = card.priorityId ? allPriorities.find(p => p.id === card.priorityId) : null;
-            const cardColor = priority ? priority.color : '#0079bf';
-            const c1 = hexToRgba(cardColor, 0.1);
-            const c2 = hexToRgba(cardColor, 0.3);
-            el.style.background = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+            // Clean flat SaaS: white surface with a colored left accent indicating priority.
+            el.style.background = 'var(--bg-surface)';
+            if (priority) {
+                el.style.borderLeft = `3px solid ${priority.color}`;
+            }
 
             const labelsHtml = card.labelIds
                 .map(lid => {

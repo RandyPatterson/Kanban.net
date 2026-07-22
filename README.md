@@ -11,10 +11,11 @@ A lightweight Kanban board web application built with ASP.NET Core MVC and .NET 
 - **Per-column sorting** — sort each column independently by position, title, priority or label via a dropdown in the column header (hidden while the column is collapsed); choice is remembered per project
 - **Labels** — create, edit, color-code and assign labels to cards
 - **Priorities** — create, edit, color-code and assign priority levels to cards
+- **Attachments** — attach files to cards; a paperclip badge shows the attachment count on the card, and files can be opened or removed from the card editor. Files are stored on disk under `App_Data/attachments/` with metadata tracked in the database
 - **Search & filter** — find cards by title/description or filter by label
 - **REST API** — JSON API for cards, columns, labels, priorities and projects
 - **MCP server** — Model Context Protocol server (Streamable HTTP + legacy SSE) that exposes CRUD tools for every board entity to LLM agents
-- **SQLite storage** — zero-config persistence in `App_Data/kanban.db` (legacy `kanban.json` files are auto-migrated on first run)
+- **SQLite storage** — zero-config persistence in `App_Data/kanban.db` (legacy `kanban.json` files are auto-migrated on first run); uploaded attachments are stored on disk under `App_Data/attachments/`
 - **PWA support** — service worker and manifest for installable web app experience
 - **Windows Service** — run as a background service that starts automatically with Windows
 
@@ -124,6 +125,9 @@ The board UI is backed by a JSON API. All card, column, label and priority endpo
 | `PUT`    | `/api/cards/{id}`       | Update a card (title, description, labels, priority) |
 | `PUT`    | `/api/cards/{id}/move`  | Move a card to a column/position |
 | `DELETE` | `/api/cards/{id}`       | Delete a card |
+| `POST`   | `/api/cards/{id}/attachments`                 | Upload a file attachment (multipart form field `file`, max 50 MB) |
+| `GET`    | `/api/cards/{id}/attachments/{attachmentId}`  | Download/open an attachment |
+| `DELETE` | `/api/cards/{id}/attachments/{attachmentId}`  | Remove an attachment (deletes the stored file) |
 
 ### Columns
 

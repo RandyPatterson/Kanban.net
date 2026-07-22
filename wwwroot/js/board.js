@@ -370,9 +370,14 @@ function renderCards() {
                 <div class="card-footer">
                     ${renderPriorityChip(card.priorityId)}
                 </div>
-                <div class="card-actions">
-                    <button onclick="editCard('${card.id}')" title="Edit" aria-label="Edit card ${escapeHtml(card.title)}">✏️ Edit</button>
-                    <button onclick="deleteCardDirect('${card.id}')" title="Delete" aria-label="Delete card ${escapeHtml(card.title)}">🗑️</button>
+                <div class="card-actions-row">
+                    ${(card.attachments && card.attachments.length)
+                        ? `<div class="card-attachment-indicator" title="${card.attachments.length} attachment(s)" aria-label="${card.attachments.length} attachment(s)">📎 ${card.attachments.length}</div>`
+                        : ''}
+                    <div class="card-actions">
+                        <button onclick="editCard('${card.id}')" title="Edit" aria-label="Edit card ${escapeHtml(card.title)}">✏️ Edit</button>
+                        <button onclick="deleteCardDirect('${card.id}')" title="Delete" aria-label="Delete card ${escapeHtml(card.title)}">🗑️</button>
+                    </div>
                 </div>
             `;
 
@@ -434,6 +439,11 @@ function openCardModal(column) {
     document.getElementById('btnDeleteCard').style.display = 'none';
     renderCardLabelCheckboxes([]);
     renderCardPriorityOptions('');
+    // Attachments require a saved card; hide the section until the card exists.
+    document.getElementById('cardAttachmentsSection').style.display = 'none';
+    document.getElementById('cardAttachments').innerHTML = '';
+    const input = document.getElementById('cardAttachmentInput');
+    if (input) input.value = '';
     new bootstrap.Modal(document.getElementById('cardModal')).show();
 }
 
@@ -448,7 +458,72 @@ function editCard(id) {
     document.getElementById('btnDeleteCard').style.display = 'inline-block';
     renderCardLabelCheckboxes(card.labelIds);
     renderCardPriorityOptions(card.priorityId || '');
+    document.getElementById('cardAttachmentsSection').style.display = 'block';
+    const input = document.getElementById('cardAttachmentInput');
+    if (input) input.value = '';
+    renderCardAttachments(card);
     new bootstrap.Modal(document.getElementById('cardModal')).show();
+}
+
+function renderCardAttachments(card) {
+    const container = document.getElementById('cardAttachments');
+    if (!container) return;
+    const attachments = card.attachments || [];
+    if (attachments.length === 0) {
+        container.innerHTML = '<small class="text-muted">No attachments yet.</small>';
+        return;
+    }
+    container.innerHTML = attachments.map(a => `
+        <div class="attachment-item" data-id="${a.id}">
+            <a href="${API.cards}/${card.id}/attachments/${a.id}${currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : ''}" target="_blank" rel="noopener" title="Open ${escapeHtml(a.fileName)}">📎 ${escapeHtml(a.fileName)}</a>
+            <button type="button" class="btn-remove-attachment" onclick="deleteAttachment('${a.id}')" title="Remove attachment" aria-label="Remove ${escapeHtml(a.fileName)}">🗑️</button>
+        </div>
+    `).join('');
+}
+
+async function uploadAttachments() {
+    const cardId = document.getElementById('cardId').value;
+    if (!cardId) { showToast('Save the card before adding attachments', 'warning'); return; }
+    const input = document.getElementById('cardAttachmentInput');
+    if (!input || !input.files || input.files.length === 0) {
+        showToast('Choose a file to upload', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnUploadAttachment');
+    if (btn) btn.disabled = true;
+    try {
+        for (const file of input.files) {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch(`${API.cards}/${cardId}/attachments`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) {
+                showToast(`Failed to upload ${file.name}`, 'danger');
+            }
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+
+    input.value = '';
+    await loadCards();
+    const card = allCards.find(c => c.id === cardId);
+    if (card) renderCardAttachments(card);
+    showToast('Attachment(s) uploaded', 'success');
+}
+
+async function deleteAttachment(attachmentId) {
+    const cardId = document.getElementById('cardId').value;
+    if (!cardId || !confirm('Remove this attachment?')) return;
+    const res = await fetch(`${API.cards}/${cardId}/attachments/${attachmentId}`, { method: 'DELETE' });
+    if (!res.ok) { showToast('Failed to remove attachment', 'danger'); return; }
+    await loadCards();
+    const card = allCards.find(c => c.id === cardId);
+    if (card) renderCardAttachments(card);
+    showToast('Attachment removed', 'success');
 }
 
 function renderCardLabelCheckboxes(selectedIds) {

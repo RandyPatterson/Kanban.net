@@ -99,6 +99,19 @@ public class SqliteStorageService
             CREATE INDEX IF NOT EXISTS IX_Cards_Position ON Cards(ColumnName, Position);
             CREATE INDEX IF NOT EXISTS IX_CardLabels_LabelId ON CardLabels(LabelId);
 
+            CREATE TABLE IF NOT EXISTS CardAttachments (
+                Id          TEXT PRIMARY KEY,
+                CardId      TEXT NOT NULL,
+                FileName    TEXT NOT NULL,
+                StoredPath  TEXT NOT NULL,
+                ContentType TEXT NOT NULL DEFAULT '',
+                Size        INTEGER NOT NULL DEFAULT 0,
+                UploadedAt  TEXT NOT NULL,
+                FOREIGN KEY (CardId) REFERENCES Cards(Id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_CardAttachments_CardId ON CardAttachments(CardId);
+
             CREATE TABLE IF NOT EXISTS Columns (
                 Id        TEXT PRIMARY KEY,
                 Title     TEXT NOT NULL,
@@ -549,6 +562,32 @@ public class SqliteStorageService
             }
         }
 
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"SELECT a.Id, a.CardId, a.FileName, a.StoredPath, a.ContentType, a.Size, a.UploadedAt
+                                FROM CardAttachments a
+                                INNER JOIN Cards c ON c.Id = a.CardId
+                                WHERE c.ProjectId = $pid;";
+            cmd.Parameters.AddWithValue("$pid", projectId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var cardId = reader.GetString(1);
+                if (cardsById.TryGetValue(cardId, out var card))
+                {
+                    card.Attachments.Add(new CardAttachment
+                    {
+                        Id = reader.GetString(0),
+                        FileName = reader.GetString(2),
+                        StoredPath = reader.GetString(3),
+                        ContentType = reader.GetString(4),
+                        Size = reader.GetInt64(5),
+                        UploadedAt = ParseDate(reader.GetString(6))
+                    });
+                }
+            }
+        }
+
         return store;
     }
 
@@ -647,6 +686,18 @@ public class SqliteStorageService
             var lCardId = insertCardLabel.CreateParameter(); lCardId.ParameterName = "$cardId"; insertCardLabel.Parameters.Add(lCardId);
             var lLabelId = insertCardLabel.CreateParameter(); lLabelId.ParameterName = "$labelId"; insertCardLabel.Parameters.Add(lLabelId);
 
+            using var insertAttachment = conn.CreateCommand();
+            insertAttachment.Transaction = tx;
+            insertAttachment.CommandText = @"INSERT INTO CardAttachments (Id, CardId, FileName, StoredPath, ContentType, Size, UploadedAt)
+                                             VALUES ($id, $cardId, $fileName, $storedPath, $contentType, $size, $uploadedAt);";
+            var aId = insertAttachment.CreateParameter(); aId.ParameterName = "$id"; insertAttachment.Parameters.Add(aId);
+            var aCardId = insertAttachment.CreateParameter(); aCardId.ParameterName = "$cardId"; insertAttachment.Parameters.Add(aCardId);
+            var aFileName = insertAttachment.CreateParameter(); aFileName.ParameterName = "$fileName"; insertAttachment.Parameters.Add(aFileName);
+            var aStoredPath = insertAttachment.CreateParameter(); aStoredPath.ParameterName = "$storedPath"; insertAttachment.Parameters.Add(aStoredPath);
+            var aContentType = insertAttachment.CreateParameter(); aContentType.ParameterName = "$contentType"; insertAttachment.Parameters.Add(aContentType);
+            var aSize = insertAttachment.CreateParameter(); aSize.ParameterName = "$size"; insertAttachment.Parameters.Add(aSize);
+            var aUploadedAt = insertAttachment.CreateParameter(); aUploadedAt.ParameterName = "$uploadedAt"; insertAttachment.Parameters.Add(aUploadedAt);
+
             var validLabelIds = new HashSet<string>(store.Labels.Select(l => l.Id));
             var validPriorityIds = new HashSet<string>(store.Priorities.Select(p => p.Id));
 
@@ -665,13 +716,30 @@ public class SqliteStorageService
                 cPid.Value = projectId;
                 insertCard.ExecuteNonQuery();
 
-                if (card.LabelIds == null) continue;
-                foreach (var labelId in card.LabelIds.Distinct())
+                if (card.LabelIds != null)
                 {
-                    if (!validLabelIds.Contains(labelId)) continue;
-                    lCardId.Value = card.Id;
-                    lLabelId.Value = labelId;
-                    insertCardLabel.ExecuteNonQuery();
+                    foreach (var labelId in card.LabelIds.Distinct())
+                    {
+                        if (!validLabelIds.Contains(labelId)) continue;
+                        lCardId.Value = card.Id;
+                        lLabelId.Value = labelId;
+                        insertCardLabel.ExecuteNonQuery();
+                    }
+                }
+
+                if (card.Attachments != null)
+                {
+                    foreach (var attachment in card.Attachments)
+                    {
+                        aId.Value = attachment.Id;
+                        aCardId.Value = card.Id;
+                        aFileName.Value = attachment.FileName ?? string.Empty;
+                        aStoredPath.Value = attachment.StoredPath ?? string.Empty;
+                        aContentType.Value = attachment.ContentType ?? string.Empty;
+                        aSize.Value = attachment.Size;
+                        aUploadedAt.Value = attachment.UploadedAt.ToString("O");
+                        insertAttachment.ExecuteNonQuery();
+                    }
                 }
             }
         }

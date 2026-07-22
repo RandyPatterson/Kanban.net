@@ -9,10 +9,12 @@ namespace kanban.net.Controllers;
 public class CardsController : ControllerBase
 {
 	private readonly SqliteStorageService _storage;
+	private readonly IWebHostEnvironment _env;
 
-	public CardsController(SqliteStorageService storage)
+	public CardsController(SqliteStorageService storage, IWebHostEnvironment env)
 	{
 		_storage = storage;
+		_env = env;
 	}
 
     private static string ResolveProjectId(string? projectId) =>
@@ -136,9 +138,101 @@ public class CardsController : ControllerBase
 		for (int i = 0; i < remaining.Count; i++)
 			remaining[i].Position = i;
 
-        await _storage.SaveAsync(store, pid);
-        return NoContent();
-    }
+		await _storage.SaveAsync(store, pid);
+		return NoContent();
+	}
+
+	[HttpPost("{id}/attachments")]
+	[RequestSizeLimit(52_428_800)] // 50 MB
+	public async Task<IActionResult> UploadAttachment(string id, IFormFile file, [FromQuery] string? projectId)
+	{
+		if (file == null || file.Length == 0)
+			return BadRequest(new { error = "No file uploaded" });
+
+		var pid = ResolveProjectId(projectId);
+		var store = await _storage.LoadAsync(pid);
+		var card = store.Cards.FirstOrDefault(c => c.Id == id);
+		if (card == null) return NotFound();
+
+		var attachmentId = Guid.NewGuid().ToString();
+		var safeName = Path.GetFileName(file.FileName);
+		if (string.IsNullOrWhiteSpace(safeName)) safeName = "file";
+
+		var relativeDir = Path.Combine("App_Data", "attachments", pid, id);
+		var absoluteDir = Path.Combine(_env.ContentRootPath, relativeDir);
+		Directory.CreateDirectory(absoluteDir);
+
+		var storedFileName = $"{attachmentId}_{safeName}";
+		var relativePath = Path.Combine(relativeDir, storedFileName);
+		var absolutePath = Path.Combine(absoluteDir, storedFileName);
+
+		using (var stream = System.IO.File.Create(absolutePath))
+		{
+			await file.CopyToAsync(stream);
+		}
+
+		var attachment = new CardAttachment
+		{
+			Id = attachmentId,
+			FileName = safeName,
+			StoredPath = relativePath.Replace('\\', '/'),
+			ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+			Size = file.Length,
+			UploadedAt = DateTime.UtcNow
+		};
+
+		card.Attachments.Add(attachment);
+		card.UpdatedAt = DateTime.UtcNow;
+		await _storage.SaveAsync(store, pid);
+
+		return Ok(attachment);
+	}
+
+	[HttpGet("{id}/attachments/{attachmentId}")]
+	public async Task<IActionResult> DownloadAttachment(string id, string attachmentId, [FromQuery] string? projectId)
+	{
+		var pid = ResolveProjectId(projectId);
+		var store = await _storage.LoadAsync(pid);
+		var card = store.Cards.FirstOrDefault(c => c.Id == id);
+		if (card == null) return NotFound();
+
+		var attachment = card.Attachments.FirstOrDefault(a => a.Id == attachmentId);
+		if (attachment == null) return NotFound();
+
+		var absolutePath = Path.Combine(_env.ContentRootPath, attachment.StoredPath.Replace('/', Path.DirectorySeparatorChar));
+		if (!System.IO.File.Exists(absolutePath)) return NotFound();
+
+		var stream = System.IO.File.OpenRead(absolutePath);
+		return File(stream, attachment.ContentType, attachment.FileName);
+	}
+
+	[HttpDelete("{id}/attachments/{attachmentId}")]
+	public async Task<IActionResult> DeleteAttachment(string id, string attachmentId, [FromQuery] string? projectId)
+	{
+		var pid = ResolveProjectId(projectId);
+		var store = await _storage.LoadAsync(pid);
+		var card = store.Cards.FirstOrDefault(c => c.Id == id);
+		if (card == null) return NotFound();
+
+		var attachment = card.Attachments.FirstOrDefault(a => a.Id == attachmentId);
+		if (attachment == null) return NotFound();
+
+		var absolutePath = Path.Combine(_env.ContentRootPath, attachment.StoredPath.Replace('/', Path.DirectorySeparatorChar));
+		try
+		{
+			if (System.IO.File.Exists(absolutePath)) System.IO.File.Delete(absolutePath);
+		}
+		catch
+		{
+			// Ignore file system errors; still remove the DB record.
+		}
+
+		card.Attachments.Remove(attachment);
+		card.UpdatedAt = DateTime.UtcNow;
+		await _storage.SaveAsync(store, pid);
+
+		return NoContent();
+	}
 }
 
 public class MoveRequest

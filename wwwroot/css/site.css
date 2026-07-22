@@ -596,6 +596,56 @@ body {
 
 .card-actions button:hover { background: var(--bg-inset-hover); color: var(--text-primary); }
 
+/* Row holding the action buttons and the attachment indicator on one line */
+.card-actions-row {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	margin-top: var(--space-2);
+}
+
+.card-actions-row .card-actions {
+	margin-top: 0;
+}
+
+/* Attachment indicator on card (left side of the actions line) */
+.card-attachment-indicator {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-right: auto;
+	font-size: var(--text-xs);
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+
+/* Attachment list in the card modal */
+.card-attachments .attachment-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: 4px 0;
+}
+
+.card-attachments .attachment-item a {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.btn-remove-attachment {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: var(--text-xs);
+	padding: 2px 6px;
+	border-radius: var(--radius-sm);
+}
+
+.btn-remove-attachment:hover { background: var(--bg-inset-hover); }
+
 /* Drop placeholder */
 .drop-placeholder {
 	border: 2px dashed var(--brand-400);

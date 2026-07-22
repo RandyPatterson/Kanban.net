@@ -71,6 +71,14 @@
                         <option value="">None</option>
                     </select>
                 </div>
+                <div class="mb-3" id="cardAttachmentsSection" style="display:none">
+                    <label class="form-label">Attachments</label>
+                    <div id="cardAttachments" class="card-attachments"></div>
+                    <div class="input-group input-group-sm mt-2">
+                        <input type="file" class="form-control" id="cardAttachmentInput" multiple />
+                        <button type="button" class="btn btn-outline-secondary" id="btnUploadAttachment" onclick="uploadAttachments()">📎 Upload</button>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger me-auto" id="btnDeleteCard" onclick="deleteCard()" style="display:none">Delete</button>
